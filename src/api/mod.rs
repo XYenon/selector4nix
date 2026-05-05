@@ -1,5 +1,6 @@
 pub mod handlers;
 
+mod error;
 mod router;
 mod state;
 
