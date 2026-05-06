@@ -15,6 +15,6 @@ pub struct AvailableSubstitutersResponse {
 pub async fn get_available_substituters(
     State(ctx): State<Arc<AppContext>>,
 ) -> Json<AvailableSubstitutersResponse> {
-    let substituters = ctx.substituter_usecase().get_available();
+    let substituters = ctx.substituter_query_usecase().get_available();
     Json(AvailableSubstitutersResponse { substituters })
 }

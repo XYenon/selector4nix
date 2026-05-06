@@ -3,11 +3,11 @@ use std::sync::Arc;
 use crate::domain::substituter::index::SubstituterAvailabilityIndex;
 use crate::domain::substituter::model::SubstituterMeta;
 
-pub struct SubstituterUseCase {
+pub struct SubstituterQueryUseCase {
     substituter_availability_index: Arc<dyn SubstituterAvailabilityIndex>,
 }
 
-impl SubstituterUseCase {
+impl SubstituterQueryUseCase {
     pub fn new(substituter_availability_index: Arc<dyn SubstituterAvailabilityIndex>) -> Self {
         Self {
             substituter_availability_index,

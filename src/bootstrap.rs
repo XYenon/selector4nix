@@ -12,8 +12,8 @@ use tracing_subscriber::EnvFilter;
 use selector4nix::api::AppContext;
 use selector4nix::application::nar::NarUseCase;
 use selector4nix::application::nar::actor::NarActor;
-use selector4nix::application::substituter::SubstituterUseCase;
 use selector4nix::application::substituter::actor::SubstituterActor;
+use selector4nix::application::substituter::usecase::SubstituterQueryUseCase;
 use selector4nix::domain::nar::model::{Nar, StorePathHash};
 use selector4nix::domain::nar::service::NarResolutionService;
 use selector4nix::domain::substituter::model::{Availability, Substituter, SubstituterMeta};
@@ -126,7 +126,7 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
             .build(),
     );
 
-    let substituter_usecase = SubstituterUseCase::new(availability_index.clone());
+    let substituter_query_usecase = SubstituterQueryUseCase::new(availability_index.clone());
 
     let nar_usecase = NarUseCase::new(
         nar_registry,
@@ -138,7 +138,7 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
     );
 
     Ok(AppContext::new(
-        substituter_usecase,
+        substituter_query_usecase,
         nar_usecase,
         config.cache_info.clone(),
     ))
