@@ -22,7 +22,7 @@ pub async fn get_nar_info(
         }
     };
 
-    let data = ctx.nar_usecase().get_nar_info(hash).await?;
+    let data = ctx.nar_resolution_usecase().get_nar_info(hash).await?;
     let response = Response::builder()
         .header(header::CONTENT_TYPE, "text/x-nix-narinfo")
         .body(Body::from(data.content().to_string()))

@@ -16,7 +16,7 @@ pub async fn get_nar(
 ) -> Result<Response<Body>, AppError> {
     let nar_file = NarFileName::new(path)?;
 
-    let data = ctx.nar_usecase().stream_nar(&nar_file).await?;
+    let data = ctx.nar_streaming_usecase().stream_nar(&nar_file).await?;
     Ok(build_response(data))
 }
 

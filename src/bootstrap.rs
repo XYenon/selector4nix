@@ -10,8 +10,8 @@ use tokio::sync::Semaphore;
 use tracing_subscriber::EnvFilter;
 
 use selector4nix::api::AppContext;
-use selector4nix::application::nar::NarUseCase;
 use selector4nix::application::nar::actor::NarActor;
+use selector4nix::application::nar::usecase::{NarResolutionUseCase, NarStreamingUseCase};
 use selector4nix::application::substituter::actor::SubstituterActor;
 use selector4nix::application::substituter::usecase::SubstituterQueryUseCase;
 use selector4nix::domain::nar::model::{Nar, StorePathHash};
@@ -64,11 +64,11 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
         })
         .collect::<Vec<_>>();
 
-    let (availability_index_pre, availability_index_view) =
+    let (substituter_availability_index_pre, substituter_availability_index_view) =
         SubstituterAvailabilityIndexActor::new(substituters.clone());
-    let availability_pub = availability_index_pre.address().erased();
-    availability_index_pre.run();
-    let availability_index = Arc::new(availability_index_view);
+    let substituter_availability_pub = substituter_availability_index_pre.address().erased();
+    substituter_availability_index_pre.run();
+    let substituter_availability_index = Arc::new(substituter_availability_index_view);
 
     let (nar_file_index_pre, nar_file_index_view) =
         NarFileIndexActor::new(config.cache.nar_location_capacity as u64);
@@ -80,7 +80,7 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
 
     let nar_info_query_service = Arc::new(NarResolutionService::new(
         nar_info_provider,
-        availability_index.clone(),
+        substituter_availability_index.clone(),
         config.proxy.rewrite_nar_url,
         config.network.tolerance,
     ));
@@ -92,7 +92,7 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
                     .iter()
                     .map(|s| (s.url().clone(), s.clone()))
                     .collect::<HashMap<_, _>>();
-                let avail_pub = availability_pub.clone();
+                let avail_pub = substituter_availability_pub.clone();
                 let lifecycle_service = substituter_lifecycle_service.clone();
                 move |url| {
                     let substituter = sub_map.get(url).cloned();
@@ -126,12 +126,14 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
             .build(),
     );
 
-    let substituter_query_usecase = SubstituterQueryUseCase::new(availability_index.clone());
+    let substituter_query_usecase =
+        SubstituterQueryUseCase::new(substituter_availability_index.clone());
 
-    let nar_usecase = NarUseCase::new(
-        nar_registry,
-        substituter_registry,
-        availability_index,
+    let nar_resolution_usecase =
+        NarResolutionUseCase::new(nar_registry.clone(), substituter_registry);
+
+    let nar_streaming_usecase = NarStreamingUseCase::new(
+        substituter_availability_index,
         nar_stream_provider,
         nar_file_index,
         nar_file_index_pub,
@@ -139,7 +141,8 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
 
     Ok(AppContext::new(
         substituter_query_usecase,
-        nar_usecase,
+        nar_resolution_usecase,
+        nar_streaming_usecase,
         config.cache_info.clone(),
     ))
 }
