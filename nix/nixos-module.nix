@@ -12,7 +12,12 @@
 let
   cfg = config.services.selector4nix;
   settingsFormat = pkgs.formats.toml { };
-  configFile = settingsFormat.generate "selector4nix.toml" cfg.settings;
+
+  rawConfigFile = settingsFormat.generate "selector4nix.raw.toml" cfg.settings;
+  configFile = pkgs.runCommand "selector4nix.toml" { } ''
+    echo 'Checking the configuration file `selector4nix.toml` via `selector4nix check`'
+    ${cfg.package}/bin/selector4nix --config-file "${rawConfigFile}" check && cp ${rawConfigFile} $out
+  '';
 in
 {
   options = {
@@ -30,6 +35,13 @@ in
         default =
           pkgs.selector4nix
             or (withSystem pkgs.stdenv.hostPlatform.system ({ config, ... }: config.packages.selector4nix));
+      };
+
+      logLevel = lib.mkOption {
+        type = lib.types.enum ["error" "warn" "info" "debug" "trace"];
+        description = "The verbosity of the logging output";
+        default = "info";
+        example = "debug";
       };
 
       settings = lib.mkOption {
@@ -93,7 +105,10 @@ in
         serviceConfig = {
           Type = "simple";
           ExecStart = "${cfg.package}/bin/selector4nix";
-          Environment = [ "SELECTOR4NIX_CONFIG_FILE=${configFile}" ];
+          Environment = [
+            "SELECTOR4NIX_CONFIG_FILE=${configFile}"
+            "RUST_LOG=selector4nix=${cfg.logLevel}"
+          ];
           Restart = "on-failure";
           RestartSec = 5;
 
