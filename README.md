@@ -101,7 +101,7 @@ In your NixOS configuration:
 {
   services.selector4nix = {
     enable = true;
-    configureSubstituter = true; # This automatically prepend the proxy to the substituter list
+    configureSubstituter = "prepend"; # This automatically prepend the proxy to the substituter list
     settings = {
       substituters = [
         {
