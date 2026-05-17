@@ -59,4 +59,6 @@ pub struct SubstituterRawConfiguration {
     pub url: String,
     pub storage_url: Option<String>,
     pub priority: Option<u32>,
+    pub nar_info_timeout_secs: Option<u64>,
+    pub nar_timeout_secs: Option<u64>,
 }

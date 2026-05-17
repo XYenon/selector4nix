@@ -205,6 +205,8 @@ pub struct SubstituterConfiguration {
     pub url: Url,
     pub storage_url: Option<Url>,
     pub priority: Priority,
+    pub nar_info_timeout: Option<Duration>,
+    pub nar_timeout: Option<Duration>,
 }
 
 impl TryFrom<SubstituterRawConfiguration> for SubstituterConfiguration {
@@ -215,6 +217,10 @@ impl TryFrom<SubstituterRawConfiguration> for SubstituterConfiguration {
             url: Url::new(&raw.url)?,
             storage_url: raw.storage_url.map(|s| Url::new(&s)).transpose()?,
             priority: raw.priority.map_or(Priority::new(40), Priority::new)?,
+            nar_info_timeout: raw
+                .nar_info_timeout_secs
+                .map(|t| Duration::from_secs(t.max(1))),
+            nar_timeout: raw.nar_timeout_secs.map(|t| Duration::from_secs(t.max(1))),
         })
     }
 }
