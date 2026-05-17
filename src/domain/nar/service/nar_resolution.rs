@@ -100,9 +100,10 @@ impl NarResolutionService {
         for substituter in substituters.iter() {
             let handle = query_tracker.spawn({
                 let provider = Arc::clone(&self.nar_info_provider);
-                let url = hash.on_substituter(substituter.target());
                 let sub = substituter.clone();
-                async move { (sub, provider.provide_nar_info(&url).await) }
+                let url = hash.on_substituter(substituter.target());
+                let timeout = sub.target().nar_info_timeout();
+                async move { (sub, provider.provide_nar_info(&url, timeout).await) }
             });
             query_cancellers.insert(substituter, handle);
         }

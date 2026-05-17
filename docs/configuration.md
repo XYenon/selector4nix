@@ -165,3 +165,15 @@ Override the base URL used for NAR file downloads.
 - Default: `40`
 
 Priority of this substituter. Higher values mean lower priority.
+
+### `substituters[].nar_info_timeout_secs`
+
+- Type: Natural
+
+Per-substituter override for NAR info lookup timeout in seconds. When unset, falls back to `network.nar_info_timeout_secs`.
+
+### `substituters[].nar_timeout_secs`
+
+- Type: Natural
+
+Per-substituter override for NAR file download timeout in seconds. When unset, falls back to `network.nar_timeout_secs`.

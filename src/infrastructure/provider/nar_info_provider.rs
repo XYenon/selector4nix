@@ -12,15 +12,15 @@ use crate::domain::substituter::model::Url;
 
 pub struct ReqwestNarInfoProvider {
     client: Client,
-    timeout: Duration,
+    default_timeout: Duration,
     concurrency: Arc<Semaphore>,
 }
 
 impl ReqwestNarInfoProvider {
-    pub fn new(client: Client, timeout: Duration, concurrency: Arc<Semaphore>) -> Self {
+    pub fn new(client: Client, default_timeout: Duration, concurrency: Arc<Semaphore>) -> Self {
         Self {
             client,
-            timeout,
+            default_timeout,
             concurrency,
         }
     }
@@ -28,12 +28,17 @@ impl ReqwestNarInfoProvider {
 
 #[async_trait]
 impl NarInfoProvider for ReqwestNarInfoProvider {
-    async fn provide_nar_info(&self, url: &Url) -> AnyhowResult<Option<NarInfoQueryData>> {
+    async fn provide_nar_info(
+        &self,
+        url: &Url,
+        timeout: Option<Duration>,
+    ) -> AnyhowResult<Option<NarInfoQueryData>> {
         tracing::debug!(%url, "fetching nar info from substituter");
 
         let _permit = self.concurrency.acquire().await.unwrap();
 
-        let request = self.client.get(url.value()).timeout(self.timeout);
+        let timeout = timeout.unwrap_or(self.default_timeout);
+        let request = self.client.get(url.value()).timeout(timeout);
 
         let start = Instant::now();
         let response = (request.send().await)
