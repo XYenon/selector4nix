@@ -25,13 +25,22 @@ use selector4nix::infrastructure::provider::*;
 use crate::cli::LogLevel;
 
 pub fn init_logger(log_level: Option<LogLevel>) {
+    let logger = tracing_subscriber::fmt();
+
     let filter = if let Some(level) = log_level {
         EnvFilter::new(level.to_string())
     } else {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
     };
+    let logger = logger.with_env_filter(filter);
 
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    // https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#$INVOCATION_ID
+    let under_systemd = std::env::var_os("INVOCATION_ID").is_some();
+    if under_systemd {
+        logger.without_time().init();
+    } else {
+        logger.init();
+    }
 }
 
 pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> {
