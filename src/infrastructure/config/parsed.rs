@@ -111,10 +111,10 @@ impl TryFrom<NetworkRawConfiguration> for NetworkConfiguration {
         Ok(Self {
             nar_info_timeout: raw
                 .nar_info_timeout_secs
-                .map_or(Duration::from_secs(30), |t| Duration::from_secs(t.max(1))),
+                .map_or(Duration::from_secs(30), to_clamped_duration),
             nar_timeout: raw
                 .nar_timeout_secs
-                .map_or(Duration::from_secs(30), |t| Duration::from_secs(t.max(1))),
+                .map_or(Duration::from_secs(30), to_clamped_duration),
             max_concurrent_requests: raw.max_concurrent_requests.unwrap_or(24),
             tolerance: raw.tolerance_msecs.unwrap_or(50).max(1),
         })
@@ -191,11 +191,11 @@ impl TryFrom<CacheRawConfiguration> for CacheConfiguration {
             nar_info_lookup_capacity: raw.nar_info_lookup_capacity.unwrap_or(4096),
             nar_info_lookup_ttl: raw
                 .nar_info_lookup_ttl_secs
-                .map_or(Duration::from_hours(4), |t| Duration::from_secs(t.max(1))),
+                .map_or(Duration::from_hours(4), to_clamped_duration),
             nar_location_capacity: raw.nar_location_capacity.unwrap_or(4096),
             nar_location_ttl: raw
                 .nar_location_ttl_secs
-                .map_or(Duration::from_hours(4), |t| Duration::from_secs(t.max(1))),
+                .map_or(Duration::from_hours(4), to_clamped_duration),
         })
     }
 }
@@ -217,10 +217,12 @@ impl TryFrom<SubstituterRawConfiguration> for SubstituterConfiguration {
             url: Url::new(&raw.url)?,
             storage_url: raw.storage_url.map(|s| Url::new(&s)).transpose()?,
             priority: raw.priority.map_or(Priority::new(40), Priority::new)?,
-            nar_info_timeout: raw
-                .nar_info_timeout_secs
-                .map(|t| Duration::from_secs(t.max(1))),
-            nar_timeout: raw.nar_timeout_secs.map(|t| Duration::from_secs(t.max(1))),
+            nar_info_timeout: raw.nar_info_timeout_secs.map(to_clamped_duration),
+            nar_timeout: raw.nar_timeout_secs.map(to_clamped_duration),
         })
     }
+}
+
+fn to_clamped_duration(secs: u64) -> Duration {
+    Duration::from_secs(secs.max(1))
 }
