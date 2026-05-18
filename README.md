@@ -10,17 +10,18 @@ A Nix substituter proxy with parallel cache queries and latency-aware selection.
 - Selects the fastest responding substituter based on latency and priority
 - Automatically detects and skips unavailable substituters, retrying them with exponential backoff
 
-Note that `selector4nix` only intents to work as a proxy rather than a full-featured cache substituter. NAR files are streamed directly from the best substituter without being cached locally. However, it does cache `.narinfo` files for better responsiveness.
+Note that `selector4nix` only intends to work as a proxy rather than a full-featured cache substituter. NAR files are streamed directly from the best substituter without being cached locally. However, it does cache `.narinfo` files for better responsiveness.
 
-The recommend way to use `selector4nix` is deploying it locally on each host. Since no large NAR file caching is used, `selector4nix` is pretty lightweight in terms of both memory footprint and CPU usage. In contrast, hosting `selector4nix` on a central node in your LAN for other machines doesn't scale well.
+The recommended way to use `selector4nix` is deploying it locally on each host. Since no large NAR file caching is used, `selector4nix` is pretty lightweight in terms of both memory footprint and CPU usage. In contrast, hosting `selector4nix` on a central node in your LAN for other machines doesn't scale well.
 
 ## Configuration
 
 `selector4nix` reads a TOML configuration file from the first of these locations:
 
-1. The path specified by the `SELECTOR4NIX_CONFIG_FILE` environment variable
-2. `./selector4nix.toml` in the current directory
-3. `/etc/selector4nix/selector4nix.toml`
+1. The path specified by the `--config-file` command line argument
+2. The path specified by the `SELECTOR4NIX_CONFIG_FILE` environment variable
+3. `./selector4nix.toml` in the current directory
+4. `/etc/selector4nix/selector4nix.toml`
 
 An example configuration is demonstrated below. For a complete reference of all available fields, see [`docs/configuration.md`](/docs/configuration.md). An annotated example configuration file is also available at [`docs/selector4nix.example.toml`](/docs/selector4nix.example.toml).
 
@@ -46,19 +47,33 @@ For NixOS, nix-darwin, and Home Manager users, it is recommended to use the modu
 
 ## Usage
 
-Start the proxy in an ad-hoc style:
+### Ad-hoc
+
+Start the proxy in an ad-hoc style, on whatever OS:
 
 ```sh
-selector4nix
+selector4nix # A configuration file must be discoverable (see Configuration above)
 ```
 
-Point Nix to the proxy, placing it before other substituters so it takes priority while keeping fallbacks:
+On the same machine, point Nix to the proxy, then everything is done. All NAR info queries and subsequent NAR fetching will transparently go through the `selector4nix` proxy.
+
+```sh
+nix build --option substituters "http://127.0.0.1:5496" ...
+```
+
+If you care about definite robustness, you can place it before other substituters so it takes priority while keeping fallbacks:
 
 ```sh
 nix build --option substituters "http://127.0.0.1:5496 https://cache.nixos.org/" ...
 ```
 
-Or use the NixOS module for declarative setup:
+### Import the NixOS/Nix-darwin/Home Manager Module (flake)
+
+Firstly, the `selector4nix` module should be imported into your system or home configuration, optionally with a Nixpkgs overlay.
+
+On the usage of Nixpkgs overlay, `selector4nix.overlays.default` is exposed and you can configure your system Nixpkgs with the overlay. This is useful when you want to build the `selector4nix` package with the toolchain provided by your system Nixpkgs instance rather than the one defined in the flake output.
+
+For NixOS:
 
 ```nix
 # flake.nix
@@ -69,19 +84,16 @@ Or use the NixOS module for declarative setup:
     nixosConfigurations.my-host = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        # Optional: use the overlay to provide `pkgs.selector4nix`
-        # This adds a top-level `selector4nix` package to `pkgs` and the NixOS module will not use
-        # the package exported by the flake directly
-        { nixpkgs.overlays = [ selector4nix.overlays.default ]; }
-
         selector4nix.nixosModules.selector4nix
+        # Optional: use the overlay to provide `pkgs.selector4nix`
+        # { nixpkgs.overlays = [ selector4nix.overlays.selector4nix ]; }
       ];
     };
   };
 }
 ```
 
-The same flake also exposes modules for nix-darwin and Home Manager:
+For nix-darwin:
 
 ```nix
 # nix-darwin flake.nix
@@ -92,8 +104,9 @@ The same flake also exposes modules for nix-darwin and Home Manager:
     darwinConfigurations.my-host = nix-darwin.lib.darwinSystem {
       system = "aarch64-darwin";
       modules = [
-        { nixpkgs.overlays = [ selector4nix.overlays.default ]; }
         selector4nix.darwinModules.selector4nix
+        # Optional: use the overlay to provide `pkgs.selector4nix`
+        # { nixpkgs.overlays = [ selector4nix.overlays.selector4nix ]; }
       ];
     };
   };
@@ -107,29 +120,42 @@ The same flake also exposes modules for nix-darwin and Home Manager:
 
   outputs = { nixpkgs, home-manager, selector4nix, ... }@inputs: {
     homeConfigurations.my-user = home-manager.lib.homeManagerConfiguration {
-      pkgs = import nixpkgs {
-        system = "x86_64-linux";
-        overlays = [ selector4nix.overlays.default ];
-      };
       modules = [
         selector4nix.homeManagerModules.selector4nix
       ];
+      # Optional: use the overlay to provide `pkgs.selector4nix`
+      # pkgs = import nixpkgs {
+      #   system = "x86_64-linux";
+      #   overlays = [ selector4nix.overlays.selector4nix ];
+      # };
     };
   };
 }
 ```
 
-Or import the package and NixOS module without going through any flake-related stuff:
+### Import the NixOS/Nix-darwin/Home Manager Module (niv, npins, etc.)
+
+For those who don't use flakes, a flake-less setup is also possible.
+
+For NixOS:
 
 ```nix
 # configuration.nix
 { config, ... }:
 {
   # Assume that there exists a `selector4nix` input in the lexical scope.
-  imports = [ (import "${selector4nix}/nix/overlay.nix" { withSystem = throw "unreachable"; }) ];
+  imports = [ (import "${selector4nix}/nix/nixos-module.nix" { withSystem = throw "unreachable"; }) ];
   nixpkgs.overlays = [ (import "${selector4nix}/nix/overlay.nix") ];
 }
 ```
+
+For nix-darwin and Home Manager, the setup is similar. The differences are how you import a module and an overlay, and the corresponding module path:
+
+- NixOS: `"${selector4nix}/nix/nixos-module.nix"`
+- nix-darwin: `"${selector4nix}/nix/darwin-module.nix"`
+- Home Manager: `"${selector4nix}/nix/home-manager-module.nix"`
+
+### Configure the Service
 
 In your NixOS, nix-darwin, or Home Manager configuration:
 
@@ -139,7 +165,7 @@ In your NixOS, nix-darwin, or Home Manager configuration:
 {
   services.selector4nix = {
     enable = true;
-    configureSubstituter = "prepend"; # This automatically prepend the proxy to the substituter list
+    configureSubstituter = "overwrite"; # This automatically overwrites the substituter list. Alternatives are "keep" and "prepend".
     settings = {
       substituters = [
         {
@@ -158,6 +184,8 @@ In your NixOS, nix-darwin, or Home Manager configuration:
   };
 }
 ```
+
+See [Configuration](#configuration) above for details.
 
 ## Build
 
