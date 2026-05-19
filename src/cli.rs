@@ -9,12 +9,19 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
+    /// Path to the configuration file
     #[arg(long = "config-file", value_name = "PATH")]
     pub config_file: Option<PathBuf>,
 
+    /// Path to the log file to which log output gets appended
+    #[arg(long = "log-file", value_name = "PATH")]
+    pub log_file: Option<PathBuf>,
+
+    /// Log verbosity level
     #[arg(long = "log-level", value_name = "LEVEL")]
     pub log_level: Option<LogLevel>,
 
+    /// Whether to hide timestamps from log output
     #[arg(long = "no-log-timestamp", default_value_t = false)]
     pub no_log_timestamp: bool,
 }
