@@ -58,13 +58,13 @@ selector4nix # A configuration file must be discoverable (see Configuration abov
 On the same machine, point Nix to the proxy, then everything is done. All NAR info queries and subsequent NAR fetching will transparently go through the `selector4nix` proxy.
 
 ```sh
-nix build --option substituters "http://127.0.0.1:5496" ...
+nix build --option substituters "http://127.0.0.1:5496/" ...
 ```
 
 If you care about definite robustness, you can place it before other substituters so it takes priority while keeping fallbacks:
 
 ```sh
-nix build --option substituters "http://127.0.0.1:5496 https://cache.nixos.org/" ...
+nix build --option substituters "http://127.0.0.1:5496/ https://cache.nixos.org/" ...
 ```
 
 ### Import the NixOS/Nix-darwin/Home Manager Module (flake)
@@ -112,6 +112,8 @@ For nix-darwin:
   };
 }
 ```
+
+For Home Manager:
 
 ```nix
 # Home Manager flake.nix
