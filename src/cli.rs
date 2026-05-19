@@ -12,6 +12,9 @@ pub struct Cli {
     #[arg(long = "config-file", value_name = "PATH")]
     pub config_file: Option<PathBuf>,
 
+    #[arg(long = "log-file", value_name = "PATH")]
+    pub log_file: Option<PathBuf>,
+
     #[arg(long = "log-level", value_name = "LEVEL")]
     pub log_level: Option<LogLevel>,
 

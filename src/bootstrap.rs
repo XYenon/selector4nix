@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result as AnyhowResult};
@@ -25,8 +27,23 @@ use tracing_subscriber::{EnvFilter, Layer, Registry};
 
 use crate::cli::LogLevel;
 
-pub fn init_logger(log_level: Option<LogLevel>, no_timestamp: bool) {
+pub fn init_logger(
+    log_file: Option<PathBuf>,
+    log_level: Option<LogLevel>,
+    no_timestamp: bool,
+) -> AnyhowResult<()> {
     let registry = tracing_subscriber::registry();
+
+    let writer = if let Some(file) = log_file {
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&file)
+            .with_context(|| format!("could not open log file: {}", file.display()))?;
+        Some(Arc::new(file))
+    } else {
+        None
+    };
 
     let filter = if let Some(level) = log_level {
         EnvFilter::new(level.to_string())
@@ -35,14 +52,26 @@ pub fn init_logger(log_level: Option<LogLevel>, no_timestamp: bool) {
     };
 
     let registry = {
-        let fmt_layer: Box<dyn Layer<Registry> + Send + Sync> = if no_timestamp {
-            let layer = tracing_subscriber::fmt::layer()
-                .without_time()
-                .with_filter(filter.clone());
-            Box::new(layer)
-        } else {
-            let layer = tracing_subscriber::fmt::layer().with_filter(filter.clone());
-            Box::new(layer)
+        let fmt_layer: Box<dyn Layer<Registry> + Send + Sync> = match (no_timestamp, writer) {
+            (true, Some(writer)) => Box::new(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_writer(writer)
+                    .with_ansi(false)
+                    .with_filter(filter.clone()),
+            ),
+            (false, Some(writer)) => Box::new(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(writer)
+                    .with_ansi(false)
+                    .with_filter(filter.clone()),
+            ),
+            (true, None) => Box::new(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_filter(filter.clone()),
+            ),
+            (false, None) => Box::new(tracing_subscriber::fmt::layer().with_filter(filter.clone())),
         };
         registry.with(fmt_layer)
     };
@@ -56,6 +85,7 @@ pub fn init_logger(log_level: Option<LogLevel>, no_timestamp: bool) {
     };
 
     registry.init();
+    Ok(())
 }
 
 pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> {
