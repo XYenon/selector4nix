@@ -11,7 +11,7 @@
 
 let
   cfg = config.services.selector4nix;
-  common = import ./module-common.nix { inherit withSystem; } { inherit lib pkgs; };
+  common = import ./common.nix { inherit withSystem; } { inherit lib pkgs; };
   configFile = common.mkConfigFile cfg;
 in
 {

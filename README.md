@@ -147,16 +147,16 @@ For NixOS:
 { config, ... }:
 {
   # Assume that there exists a `selector4nix` input in the lexical scope.
-  imports = [ (import "${selector4nix}/nix/nixos-module.nix" { withSystem = throw "unreachable"; }) ];
+  imports = [ (import "${selector4nix}/nix/modules/nixos.nix" { withSystem = throw "unreachable"; }) ];
   nixpkgs.overlays = [ (import "${selector4nix}/nix/overlay.nix") ];
 }
 ```
 
 For nix-darwin and Home Manager, the setup is similar. The differences are how you import a module and an overlay, and the corresponding module path:
 
-- NixOS: `"${selector4nix}/nix/nixos-module.nix"`
-- nix-darwin: `"${selector4nix}/nix/darwin-module.nix"`
-- Home Manager: `"${selector4nix}/nix/home-manager-module.nix"`
+- NixOS: `"${selector4nix}/nix/modules/nixos.nix"`
+- nix-darwin: `"${selector4nix}/nix/modules/darwin.nix"`
+- Home Manager: `"${selector4nix}/nix/modules/home-manager.nix"`
 
 ### Configure the Service
 
@@ -168,7 +168,11 @@ In your NixOS, nix-darwin, or Home Manager configuration:
 {
   services.selector4nix = {
     enable = true;
-    configureSubstituter = "overwrite"; # This automatically overwrites the substituter list. Alternatives are "keep" and "prepend".
+
+    # This automatically overwrites the substituter list.
+    # Alternatives are "keep" (default) and "prepend".
+    configureSubstituter = "overwrite";
+
     settings = {
       substituters = [
         {
