@@ -25,7 +25,7 @@ async fn main() -> AnyhowResult<()> {
 
     match cli.command.unwrap_or(Commands::Serve) {
         Commands::Serve => {
-            let context = bootstrap::init_context(&config)?;
+            let context = bootstrap::init_context(&config).await?;
             serve(config, context).await
         }
         Commands::Check => {

@@ -103,6 +103,7 @@ pub struct NetworkConfiguration {
     pub max_concurrent_requests: usize,
     pub tolerance: u64,
     pub ignore_nar_info_error: bool,
+    pub periodic_probing: bool,
 }
 
 impl TryFrom<NetworkRawConfiguration> for NetworkConfiguration {
@@ -119,6 +120,7 @@ impl TryFrom<NetworkRawConfiguration> for NetworkConfiguration {
             max_concurrent_requests: raw.max_concurrent_requests.unwrap_or(24),
             tolerance: raw.tolerance_msecs.unwrap_or(50).max(1),
             ignore_nar_info_error: raw.ignore_nar_info_error.unwrap_or(false),
+            periodic_probing: raw.periodic_probing.unwrap_or(true),
         })
     }
 }

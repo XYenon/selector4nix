@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -17,6 +16,7 @@ use selector4nix::domain::substituter::service::SubstituterLifecycleService;
 use selector4nix::infrastructure::config::AppConfiguration;
 use selector4nix::infrastructure::index::*;
 use selector4nix::infrastructure::provider::*;
+use selector4nix_actor::actor::Address;
 use selector4nix_actor::registry::{
     AsyncFactory, CapacityOption, ExpirationOption, RegistryBuilder,
 };
@@ -88,7 +88,7 @@ pub fn init_logger(
     Ok(())
 }
 
-pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> {
+pub async fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> {
     let http_client = Client::builder()
         .user_agent(format!(
             "curl/8.7.1 Nix/2.24.11 {}/{}",
@@ -142,7 +142,9 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
     nar_file_index_pre.run();
     let nar_file_index = Arc::new(nar_file_index_view);
 
-    let substituter_lifecycle_service = Arc::new(SubstituterLifecycleService::new());
+    let substituter_lifecycle_service = Arc::new(SubstituterLifecycleService::new(
+        config.network.periodic_probing,
+    ));
 
     let nar_info_query_service = Arc::new(NarResolutionService::new(
         nar_info_provider,
@@ -152,32 +154,28 @@ pub fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> 
         config.network.ignore_nar_info_error,
     ));
 
-    let substituter_registry = Arc::new(
-        RegistryBuilder::new()
-            .factory(AsyncFactory::new({
-                let sub_map = substituters
-                    .iter()
-                    .map(|s| (s.url().clone(), s.clone()))
-                    .collect::<HashMap<_, _>>();
-                let avail_pub = substituter_availability_pub.clone();
-                let lifecycle_service = substituter_lifecycle_service.clone();
-                move |url| {
-                    let substituter = sub_map.get(url).cloned();
-                    let avail_pub = avail_pub.clone();
-                    let lifecycle_service = lifecycle_service.clone();
-                    let sub_probing_provider = substituter_probing_provider.clone();
-                    let addr = SubstituterActor::new(
-                        substituter,
-                        lifecycle_service,
-                        sub_probing_provider,
-                        avail_pub,
-                    )
-                    .run();
-                    async move { addr }
-                }
+    let substituter_registry = Arc::new({
+        let registry = RegistryBuilder::new()
+            .factory(AsyncFactory::new(|_| async {
+                // No additional actor will be loaded here as those actors are created eagerly
+                Address::mock().0
             }))
-            .build(),
-    );
+            .build();
+        for sub in &substituters {
+            let avail_pub = substituter_availability_pub.clone();
+            let lifecycle_service = substituter_lifecycle_service.clone();
+            let sub_probing_provider = substituter_probing_provider.clone();
+            let addr = SubstituterActor::new(
+                Some(sub.clone()),
+                lifecycle_service,
+                sub_probing_provider,
+                avail_pub,
+            )
+            .run();
+            registry.insert(sub.url().clone(), addr).await;
+        }
+        registry
+    });
 
     let nar_registry = Arc::new(
         RegistryBuilder::new()
