@@ -1,12 +1,12 @@
 use getset::Getters;
 
-use crate::domain::nar_info::model::{NarInfoData, StorePathHash};
+use crate::domain::nar_info::model::{ProxyNarInfoData, StorePathHash, UpstreamNarInfoData};
 use crate::domain::substituter::model::{SubstituterMeta, Url};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NarInfoResolution {
     Resolved {
-        nar_info: NarInfoData,
+        nar_info: ProxyNarInfoData,
         substituter: SubstituterMeta,
         source_url: Url,
     },
@@ -15,21 +15,20 @@ pub enum NarInfoResolution {
 
 impl NarInfoResolution {
     pub fn from_completed_query(
-        successful_outcome: Option<(NarInfoData, SubstituterMeta)>,
+        successful_outcome: Option<(UpstreamNarInfoData, SubstituterMeta)>,
         rewrite_nar_url: NarUrlRewriteOption,
     ) -> Self {
         match successful_outcome {
             Some((nar_info, substituter)) => {
-                let source_url = nar_info.source_url().cloned().unwrap_or_else(|| {
-                    nar_info
-                        .nar_file()
-                        .with_storage_prefix(substituter.storage_url())
-                });
-                let nar_info = match rewrite_nar_url {
-                    NarUrlRewriteOption::Keep => nar_info,
-                    NarUrlRewriteOption::ToSelf => nar_info.rewrite_url_to_self(),
+                let (nar_info, source_url) = match rewrite_nar_url {
+                    NarUrlRewriteOption::Keep => {
+                        ProxyNarInfoData::proxy_by_keep_url(&nar_info, &substituter)
+                    }
+                    NarUrlRewriteOption::ToSelf => {
+                        ProxyNarInfoData::proxy_by_rewrite_url_to_self(&nar_info, &substituter)
+                    }
                     NarUrlRewriteOption::ToUpstream => {
-                        nar_info.set_source_and_rewrite_url(substituter.storage_url())
+                        ProxyNarInfoData::proxy_by_rewrite_url_to_upstream(&nar_info, &substituter)
                     }
                 };
                 Self::Resolved {
@@ -42,7 +41,7 @@ impl NarInfoResolution {
         }
     }
 
-    pub fn nar_info(&self) -> Option<&NarInfoData> {
+    pub fn nar_info(&self) -> Option<&ProxyNarInfoData> {
         match self {
             Self::Resolved { nar_info, .. } => Some(nar_info),
             _ => None,
@@ -88,7 +87,7 @@ impl NarInfo {
         self.resolution.as_ref()
     }
 
-    pub fn nar_info(&self) -> Option<&NarInfoData> {
+    pub fn nar_info(&self) -> Option<&ProxyNarInfoData> {
         self.resolution().and_then(NarInfoResolution::nar_info)
     }
 
@@ -107,8 +106,8 @@ mod tests {
         StorePathHash::new("p4pclmv1gyja5kzc26npqpia1qqxrf0l".into()).unwrap()
     }
 
-    fn make_nar_info_data() -> NarInfoData {
-        NarInfoData::original(
+    fn make_upstream_nar_info_data() -> UpstreamNarInfoData {
+        UpstreamNarInfoData::new(
             "StorePath: /nix/store/p4pclmv1gyja5kzc26npqpia1qqxrf0l-ruby-2.7.3\n\
              URL: nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz\n"
                 .into(),
@@ -116,8 +115,8 @@ mod tests {
         .unwrap()
     }
 
-    fn make_nar_info_data_with_external_url() -> NarInfoData {
-        NarInfoData::original(
+    fn make_upstream_nar_info_data_with_external_url() -> UpstreamNarInfoData {
+        UpstreamNarInfoData::new(
             "StorePath: /nix/store/p4pclmv1gyja5kzc26npqpia1qqxrf0l-ruby-2.7.3\n\
              URL: https://storage.example.com/nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz\n"
                 .into(),
@@ -149,7 +148,7 @@ mod tests {
     #[test]
     fn from_completed_query_resolves_given_relative_url() {
         let resolution = NarInfoResolution::from_completed_query(
-            Some((make_nar_info_data(), make_substituter_meta())),
+            Some((make_upstream_nar_info_data(), make_substituter_meta())),
             NarUrlRewriteOption::ToSelf,
         );
 
@@ -175,7 +174,7 @@ mod tests {
     fn from_completed_query_resolves_given_external_url_and_rewrite_true() {
         let resolution = NarInfoResolution::from_completed_query(
             Some((
-                make_nar_info_data_with_external_url(),
+                make_upstream_nar_info_data_with_external_url(),
                 make_substituter_meta(),
             )),
             NarUrlRewriteOption::ToSelf,
@@ -204,7 +203,7 @@ mod tests {
     fn from_completed_query_preserves_external_url_given_rewrite_false() {
         let resolution = NarInfoResolution::from_completed_query(
             Some((
-                make_nar_info_data_with_external_url(),
+                make_upstream_nar_info_data_with_external_url(),
                 make_substituter_meta(),
             )),
             NarUrlRewriteOption::Keep,

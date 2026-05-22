@@ -7,7 +7,7 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 
 use crate::domain::nar_info::model::{
-    NarFileName, NarInfoData, NarInfoResolution, NarUrlRewriteOption, StorePathHash,
+    NarFileName, NarInfoResolution, NarUrlRewriteOption, StorePathHash, UpstreamNarInfoData,
 };
 use crate::domain::nar_info::port::{NarInfoProvider, QueryNarInfoError};
 use crate::domain::nar_info::service::DeadlineGroup;
@@ -79,7 +79,7 @@ impl NarInfoResolutionService {
         &self,
         hash: &StorePathHash,
     ) -> (
-        Result<Option<(NarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
+        Result<Option<(UpstreamNarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
         Vec<ResolveNarInfoEvent>,
     ) {
         let substituters = self.substituter_availability_index.query_all();
@@ -102,7 +102,7 @@ impl NarInfoResolutionService {
         substituters: Arc<Vec<Substituter>>,
         tolerance: u64,
     ) -> (
-        Result<Option<(Substituter, NarInfoData)>, ResolveNarInfoError>,
+        Result<Option<(Substituter, UpstreamNarInfoData)>, ResolveNarInfoError>,
         Vec<ResolveNarInfoEvent>,
     ) {
         let mut substituter_graces = HashMap::new();
@@ -156,7 +156,7 @@ impl NarInfoResolutionService {
                     if let Some(data) = outcome {
                         let current = NarInfoQueryCandidate {
                             substituter,
-                            nar_info: data.original_data,
+                            nar_info: data.upstream_data,
                             grace: current_grace,
                             latency: data.latency,
                         };
@@ -221,7 +221,7 @@ pub enum ResolveNarInfoError {
 
 struct NarInfoQueryCandidate {
     substituter: Substituter,
-    nar_info: NarInfoData,
+    nar_info: UpstreamNarInfoData,
     grace: i64,
     latency: Duration,
 }

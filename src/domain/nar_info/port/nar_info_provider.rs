@@ -4,7 +4,7 @@ use anyhow::Error as AnyhowError;
 use async_trait::async_trait;
 use snafu::Snafu;
 
-use crate::domain::nar_info::model::NarInfoData;
+use crate::domain::nar_info::model::UpstreamNarInfoData;
 use crate::domain::substituter::model::Url;
 
 #[async_trait]
@@ -18,14 +18,14 @@ pub trait NarInfoProvider: Send + Sync {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NarInfoQueryData {
-    pub original_data: NarInfoData,
+    pub upstream_data: UpstreamNarInfoData,
     pub latency: Duration,
 }
 
 impl NarInfoQueryData {
-    pub fn new(original_data: NarInfoData, latency: Duration) -> Self {
+    pub fn new(original_data: UpstreamNarInfoData, latency: Duration) -> Self {
         Self {
-            original_data,
+            upstream_data: original_data,
             latency,
         }
     }

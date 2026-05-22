@@ -7,7 +7,7 @@ use reqwest::{Client, StatusCode};
 use snafu::ResultExt;
 use tokio::sync::Semaphore;
 
-use crate::domain::nar_info::model::NarInfoData;
+use crate::domain::nar_info::model::UpstreamNarInfoData;
 use crate::domain::nar_info::port::error_ctx::{OfflineSnafu, ServiceSnafu};
 use crate::domain::nar_info::port::{NarInfoProvider, NarInfoQueryData, QueryNarInfoError};
 use crate::domain::substituter::model::Url;
@@ -63,7 +63,7 @@ impl NarInfoProvider for ReqwestNarInfoProvider {
                     .context(ServiceSnafu)
                     .inspect_err(|_| tracing::debug!(%url, "failed to read nar info body"))?;
                 let latency = start.elapsed();
-                let original_data = NarInfoData::original(text)
+                let original_data = UpstreamNarInfoData::new(text)
                     .map_err(|err| AnyhowError::new(err))
                     .map_err(|err| err.context(format!("invalid nar info from {url}")))
                     .context(ServiceSnafu)

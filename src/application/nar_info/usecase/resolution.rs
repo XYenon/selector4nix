@@ -5,7 +5,7 @@ use crate::application::nar_info::actor::{NarInfoActorRegistry, NarInfoRequest};
 use crate::application::substituter::actor::{SubstituterActorRegistry, SubstituterRequest};
 use crate::application::{AppErrorKind, AppOptionExt, AppResult, AppResultExt};
 use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
-use crate::domain::nar_info::model::{NarInfoData, StorePathHash};
+use crate::domain::nar_info::model::{ProxyNarInfoData, StorePathHash};
 use crate::domain::nar_info::service::{ResolveNarInfoError, ResolveNarInfoEvent};
 
 pub struct NarInfoResolutionUseCase {
@@ -27,7 +27,7 @@ impl NarInfoResolutionUseCase {
         }
     }
 
-    pub async fn get_nar_info(&self, hash: StorePathHash) -> AppResult<NarInfoData> {
+    pub async fn get_nar_info(&self, hash: StorePathHash) -> AppResult<ProxyNarInfoData> {
         tracing::info!(hash = %hash.value(), "resolving nar info");
 
         let address = self.nar_info_registry.get(&hash).await;

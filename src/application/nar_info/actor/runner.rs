@@ -3,7 +3,7 @@ use std::sync::Arc;
 use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, Context, EmptyInternal};
 use tokio::sync::oneshot::Sender as OneshotSender;
 
-use crate::domain::nar_info::model::{NarInfo, NarInfoData};
+use crate::domain::nar_info::model::{NarInfo, ProxyNarInfoData};
 use crate::domain::nar_info::service::{
     NarInfoResolutionService, ResolveNarInfoError, ResolveNarInfoEvent,
 };
@@ -15,13 +15,13 @@ pub enum NarInfoRequest {
 
 #[derive(Debug)]
 pub struct ResolveNarInfoResponse {
-    pub result: Result<Option<NarInfoData>, ResolveNarInfoError>,
+    pub result: Result<Option<ProxyNarInfoData>, ResolveNarInfoError>,
     pub events: Vec<ResolveNarInfoEvent>,
 }
 
 impl ResolveNarInfoResponse {
     pub fn new(
-        result: Result<Option<NarInfoData>, ResolveNarInfoError>,
+        result: Result<Option<ProxyNarInfoData>, ResolveNarInfoError>,
         events: Vec<ResolveNarInfoEvent>,
     ) -> Self {
         Self { result, events }

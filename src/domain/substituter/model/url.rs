@@ -20,6 +20,10 @@ impl Url {
         Ok(Self(parsed))
     }
 
+    pub fn inner(&self) -> &UrlInner {
+        &self.0
+    }
+
     pub fn value(&self) -> &str {
         self.0.as_str()
     }

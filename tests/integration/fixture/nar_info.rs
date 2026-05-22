@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use selector4nix::domain::nar_info::model::{NarFileName, NarInfoData, StorePathHash};
+use selector4nix::domain::nar_info::model::{NarFileName, StorePathHash, UpstreamNarInfoData};
 use selector4nix::domain::nar_info::port::NarInfoQueryData;
 use selector4nix::domain::substituter::model::Url;
 
@@ -17,8 +17,8 @@ pub fn make_nar_file_name() -> NarFileName {
     NarFileName::new(NAR_FILE.to_string()).unwrap()
 }
 
-pub fn make_nar_info_data() -> NarInfoData {
-    NarInfoData::original(format!(
+pub fn make_upstream_nar_info_data() -> UpstreamNarInfoData {
+    UpstreamNarInfoData::new(format!(
         "StorePath: /nix/store/{STORE_PATH_HASH}-ruby-2.7.3\n\
          URL: nar/{NAR_FILE}\n\
          Compression: xz\n"
@@ -32,5 +32,5 @@ pub fn make_nar_info_url(substituter_url: &Url, hash: &StorePathHash) -> Url {
 }
 
 pub fn make_nar_info_query_data(latency: Duration) -> NarInfoQueryData {
-    NarInfoQueryData::new(make_nar_info_data(), latency)
+    NarInfoQueryData::new(make_upstream_nar_info_data(), latency)
 }
