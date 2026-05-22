@@ -1,6 +1,6 @@
 mod resolution;
 mod util;
 
-pub use resolution::{NarInfoResolutionEvent, NarInfoResolutionService, ResolveNarInfoError};
+pub use resolution::{NarInfoResolutionService, ResolveNarInfoError, ResolveNarInfoEvent};
 
 use util::DeadlineGroup;

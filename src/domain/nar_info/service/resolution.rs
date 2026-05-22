@@ -6,6 +6,7 @@ use snafu::Snafu;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
+use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
 use crate::domain::nar_info::model::{
     NarInfoData, NarInfoResolution, NarUrlRewriteOption, StorePathHash,
 };
@@ -44,13 +45,21 @@ impl NarInfoResolutionService {
         hash: &StorePathHash,
     ) -> (
         Result<NarInfoResolution, ResolveNarInfoError>,
-        Vec<NarInfoResolutionEvent>,
+        Vec<ResolveNarInfoEvent>,
     ) {
-        let (res, events) = self.resolve_unknown(hash).await;
+        let (res, mut events) = self.resolve_unknown(hash).await;
         match res {
             Ok(outcome) => {
                 let resolution =
                     NarInfoResolution::from_completed_query(outcome, self.rewrite_nar_url);
+                if let NarInfoResolution::Resolved { nar_info, location } = &resolution
+                    && let Some(nar_file_key) = NarFileKey::from_file_name(nar_info.nar_file())
+                {
+                    events.push(ResolveNarInfoEvent::NarFileLocated {
+                        nar_file_key,
+                        location: location.clone(),
+                    });
+                }
                 if let Some(source_url) = resolution.source_url() {
                     tracing::debug!(hash = %hash.value(), %source_url, "selected source url from substituter");
                 }
@@ -65,7 +74,7 @@ impl NarInfoResolutionService {
         hash: &StorePathHash,
     ) -> (
         Result<Option<(NarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
-        Vec<NarInfoResolutionEvent>,
+        Vec<ResolveNarInfoEvent>,
     ) {
         let substituters = self.substituter_availability_index.query_all();
 
@@ -88,7 +97,7 @@ impl NarInfoResolutionService {
         tolerance: u64,
     ) -> (
         Result<Option<(Substituter, NarInfoData)>, ResolveNarInfoError>,
-        Vec<NarInfoResolutionEvent>,
+        Vec<ResolveNarInfoEvent>,
     ) {
         let mut substituter_graces = HashMap::new();
         for substituter in substituters.iter() {
@@ -135,7 +144,7 @@ impl NarInfoResolutionService {
                     let current_grace = substituter_graces.remove(&substituter).unwrap();
                     if !substituter.is_normal() {
                         let url = substituter.url().clone();
-                        events.push(NarInfoResolutionEvent::SubstituterSucceeded(url));
+                        events.push(ResolveNarInfoEvent::SubstituterSucceeded(url));
                     }
 
                     if let Some(data) = outcome {
@@ -165,10 +174,10 @@ impl NarInfoResolutionService {
                     let url = substituter.url().clone();
                     match e {
                         QueryNarInfoError::Offline { .. } => {
-                            events.push(NarInfoResolutionEvent::SubstituterOffline(url));
+                            events.push(ResolveNarInfoEvent::SubstituterOffline(url));
                         }
                         QueryNarInfoError::Service { .. } => {
-                            events.push(NarInfoResolutionEvent::SubstituterError(url));
+                            events.push(ResolveNarInfoEvent::SubstituterError(url));
                         }
                     }
                 }
@@ -186,10 +195,14 @@ impl NarInfoResolutionService {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum NarInfoResolutionEvent {
+pub enum ResolveNarInfoEvent {
     SubstituterSucceeded(Url),
     SubstituterOffline(Url),
     SubstituterError(Url),
+    NarFileLocated {
+        nar_file_key: NarFileKey,
+        location: NarFileLocation,
+    },
 }
 
 #[derive(Snafu, Debug, Clone, PartialEq, Eq)]

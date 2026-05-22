@@ -5,7 +5,7 @@ use tokio::sync::oneshot::Sender as OneshotSender;
 
 use crate::domain::nar_info::model::{NarInfo, NarInfoData};
 use crate::domain::nar_info::service::{
-    NarInfoResolutionEvent, NarInfoResolutionService, ResolveNarInfoError,
+    NarInfoResolutionService, ResolveNarInfoError, ResolveNarInfoEvent,
 };
 
 #[derive(Debug)]
@@ -16,13 +16,13 @@ pub enum NarInfoRequest {
 #[derive(Debug)]
 pub struct ResolveNarInfoResponse {
     pub result: Result<Option<NarInfoData>, ResolveNarInfoError>,
-    pub events: Vec<NarInfoResolutionEvent>,
+    pub events: Vec<ResolveNarInfoEvent>,
 }
 
 impl ResolveNarInfoResponse {
     pub fn new(
         result: Result<Option<NarInfoData>, ResolveNarInfoError>,
-        events: Vec<NarInfoResolutionEvent>,
+        events: Vec<ResolveNarInfoEvent>,
     ) -> Self {
         Self { result, events }
     }
@@ -31,18 +31,18 @@ impl ResolveNarInfoResponse {
 pub struct NarInfoActor {
     init: Option<NarInfo>,
     context: Context<NarInfoRequest, EmptyInternal>,
-    nar_info_query_service: Arc<NarInfoResolutionService>,
+    nar_info_resolution_service: Arc<NarInfoResolutionService>,
 }
 
 impl NarInfoActor {
     pub fn new(
         init: NarInfo,
-        nar_info_query_service: Arc<NarInfoResolutionService>,
+        nar_info_resolution_service: Arc<NarInfoResolutionService>,
     ) -> ActorPre<Self> {
         ActorPreBuilder::inject(|context| Self {
             init: Some(init),
             context,
-            nar_info_query_service,
+            nar_info_resolution_service,
         })
     }
 
@@ -57,7 +57,7 @@ impl NarInfoActor {
             return nar;
         }
 
-        let (res, events) = self.nar_info_query_service.resolve(nar.hash()).await;
+        let (res, events) = self.nar_info_resolution_service.resolve(nar.hash()).await;
         match res {
             Ok(resolution) => {
                 let res = Ok(resolution.nar_info().cloned());

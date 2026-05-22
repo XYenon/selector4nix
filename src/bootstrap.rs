@@ -215,10 +215,13 @@ pub async fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppCont
     let substituter_query_usecase =
         SubstituterQueryUseCase::new(substituter_availability_index.clone());
 
-    let nar_info_resolution_usecase =
-        NarInfoResolutionUseCase::new(nar_info_registry.clone(), substituter_registry);
+    let nar_file_streaming_usecase = NarFileStreamingUseCase::new(nar_file_registry.clone());
 
-    let nar_file_streaming_usecase = NarFileStreamingUseCase::new(nar_file_registry);
+    let nar_info_resolution_usecase = NarInfoResolutionUseCase::new(
+        nar_info_registry.clone(),
+        substituter_registry,
+        nar_file_registry,
+    );
 
     Ok(AppContext::new(
         substituter_query_usecase,

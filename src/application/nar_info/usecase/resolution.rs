@@ -1,31 +1,35 @@
 use std::sync::Arc;
 
+use crate::application::nar_file::actor::{NarFileActorRegistry, NarFileRequest};
 use crate::application::nar_info::actor::{NarInfoActorRegistry, NarInfoRequest};
 use crate::application::substituter::actor::{SubstituterActorRegistry, SubstituterRequest};
 use crate::application::{AppErrorKind, AppOptionExt, AppResult, AppResultExt};
 use crate::domain::nar_info::model::{NarInfoData, StorePathHash};
-use crate::domain::nar_info::service::{NarInfoResolutionEvent, ResolveNarInfoError};
+use crate::domain::nar_info::service::{ResolveNarInfoError, ResolveNarInfoEvent};
 
 pub struct NarInfoResolutionUseCase {
-    nar_registry: Arc<NarInfoActorRegistry>,
+    nar_info_registry: Arc<NarInfoActorRegistry>,
     substituter_registry: Arc<SubstituterActorRegistry>,
+    nar_file_registry: Arc<NarFileActorRegistry>,
 }
 
 impl NarInfoResolutionUseCase {
     pub fn new(
-        nar_registry: Arc<NarInfoActorRegistry>,
+        nar_info_registry: Arc<NarInfoActorRegistry>,
         substituter_registry: Arc<SubstituterActorRegistry>,
+        nar_file_registry: Arc<NarFileActorRegistry>,
     ) -> Self {
         Self {
-            nar_registry,
+            nar_info_registry,
             substituter_registry,
+            nar_file_registry,
         }
     }
 
     pub async fn get_nar_info(&self, hash: StorePathHash) -> AppResult<NarInfoData> {
         tracing::info!(hash = %hash.value(), "resolving nar info");
 
-        let address = self.nar_registry.get(&hash).await;
+        let address = self.nar_info_registry.get(&hash).await;
 
         let response = address
             .ask(|reply_to| NarInfoRequest::ResolveNarInfo(reply_to))
@@ -49,25 +53,29 @@ impl NarInfoResolutionUseCase {
         response.result?.flat()
     }
 
-    async fn exec_events(&self, events: Vec<NarInfoResolutionEvent>) {
+    async fn exec_events(&self, events: Vec<ResolveNarInfoEvent>) {
         for event in events {
             self.exec_event(event).await;
         }
     }
 
-    async fn exec_event(&self, event: NarInfoResolutionEvent) {
+    async fn exec_event(&self, event: ResolveNarInfoEvent) {
         match event {
-            NarInfoResolutionEvent::SubstituterSucceeded(url) => {
+            ResolveNarInfoEvent::SubstituterSucceeded(url) => {
                 let sender = self.substituter_registry.get(&url).await;
                 let _ = sender.tell(SubstituterRequest::ServiceSuccessful).await;
             }
-            NarInfoResolutionEvent::SubstituterOffline(url) => {
+            ResolveNarInfoEvent::SubstituterOffline(url) => {
                 let sender = self.substituter_registry.get(&url).await;
                 let _ = sender.tell(SubstituterRequest::ServiceOffline).await;
             }
-            NarInfoResolutionEvent::SubstituterError(url) => {
+            ResolveNarInfoEvent::SubstituterError(url) => {
                 let sender = self.substituter_registry.get(&url).await;
                 let _ = sender.tell(SubstituterRequest::ServiceError).await;
+            }
+            ResolveNarInfoEvent::NarFileLocated { nar_file_key, location } => {
+                let sender = self.nar_file_registry.get(&nar_file_key).await;
+                let _ = sender.tell(NarFileRequest::SetLocation(location)).await;
             }
         }
     }

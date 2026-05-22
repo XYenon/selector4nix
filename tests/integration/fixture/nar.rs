@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use selector4nix::domain::nar_file::model::{NarFileKey, NarFileLocation};
 use selector4nix::domain::nar_info::model::{NarFileName, NarInfoData, StorePathHash};
 use selector4nix::domain::nar_info::port::NarInfoQueryData;
 use selector4nix::domain::substituter::model::Url;
@@ -36,4 +37,13 @@ pub fn make_source_url(substituter_url: &Url, priority: u32) -> Url {
 
 pub fn make_nar_info_query_data(latency: Duration) -> NarInfoQueryData {
     NarInfoQueryData::new(make_nar_info_data(), latency)
+}
+
+pub fn make_nar_file_key() -> NarFileKey {
+    let nar_file = NarFileName::new(NAR_FILE.to_string()).unwrap();
+    NarFileKey::from_file_name(&nar_file).unwrap()
+}
+
+pub fn make_nar_file_location(substituter_url: &Url, priority: u32) -> NarFileLocation {
+    NarFileLocation::new(make_source_url(substituter_url, priority), None)
 }
