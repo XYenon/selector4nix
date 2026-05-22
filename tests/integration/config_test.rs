@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use selector4nix::domain::nar::model::NarUrlRewriteOption;
+use selector4nix::domain::nar_info::model::NarUrlRewriteOption;
 use selector4nix::infrastructure::config::AppConfiguration;
 
 use super::fixture;

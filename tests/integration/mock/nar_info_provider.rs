@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use selector4nix::domain::nar::port::error_ctx::{OfflineSnafu, ServiceSnafu};
-use selector4nix::domain::nar::port::{NarInfoProvider, NarInfoQueryData, QueryNarInfoError};
+use selector4nix::domain::nar_info::port::error_ctx::{OfflineSnafu, ServiceSnafu};
+use selector4nix::domain::nar_info::port::{NarInfoProvider, NarInfoQueryData, QueryNarInfoError};
 use selector4nix::domain::substituter::model::Url;
 use snafu::ResultExt;
 

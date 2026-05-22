@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Error as AnyhowError, Result as AnyhowResult};
 
-use crate::domain::nar::model::NarUrlRewriteOption;
+use crate::domain::nar_info::model::NarUrlRewriteOption;
 use crate::domain::substituter::model::{Priority, Url};
 use crate::infrastructure::config::raw::{
     AppRawConfiguration, CacheInfoRawConfiguration, CacheRawConfiguration, NetworkRawConfiguration,

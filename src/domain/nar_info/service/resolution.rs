@@ -1,0 +1,246 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
+use snafu::Snafu;
+use tokio::task::JoinSet;
+use tokio::time::Instant;
+
+use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
+use crate::domain::nar_info::model::{
+    NarInfoData, NarInfoResolution, NarUrlRewriteOption, StorePathHash,
+};
+use crate::domain::nar_info::port::{NarInfoProvider, QueryNarInfoError};
+use crate::domain::nar_info::service::DeadlineGroup;
+use crate::domain::substituter::index::SubstituterAvailabilityIndex;
+use crate::domain::substituter::model::{Substituter, SubstituterMeta, Url};
+
+pub struct NarInfoResolutionService {
+    nar_info_provider: Arc<dyn NarInfoProvider>,
+    substituter_availability_index: Arc<dyn SubstituterAvailabilityIndex>,
+    rewrite_nar_url: NarUrlRewriteOption,
+    tolerance: u64,
+    ignore_query_error: bool,
+}
+
+impl NarInfoResolutionService {
+    pub fn new(
+        nar_info_provider: Arc<dyn NarInfoProvider>,
+        substituter_availability_index: Arc<dyn SubstituterAvailabilityIndex>,
+        rewrite_nar_url: NarUrlRewriteOption,
+        tolerance: u64,
+        ignore_query_error: bool,
+    ) -> Self {
+        Self {
+            nar_info_provider,
+            substituter_availability_index,
+            rewrite_nar_url,
+            tolerance,
+            ignore_query_error,
+        }
+    }
+
+    pub async fn resolve(
+        &self,
+        hash: &StorePathHash,
+    ) -> (
+        Result<NarInfoResolution, ResolveNarInfoError>,
+        Vec<ResolveNarInfoEvent>,
+    ) {
+        let (res, mut events) = self.resolve_unknown(hash).await;
+        match res {
+            Ok(outcome) => {
+                let resolution =
+                    NarInfoResolution::from_completed_query(outcome, self.rewrite_nar_url);
+                if let NarInfoResolution::Resolved { nar_info, location } = &resolution {
+                    events.push(ResolveNarInfoEvent::NarFileLocated {
+                        nar_file_key: NarFileKey::from_file_name(nar_info.nar_file()),
+                        location: location.clone(),
+                    });
+                }
+                if let Some(source_url) = resolution.source_url() {
+                    tracing::debug!(hash = %hash.value(), %source_url, "selected source url from substituter");
+                }
+                (Ok(resolution), events)
+            }
+            Err(err) => (Err(err), events),
+        }
+    }
+
+    async fn resolve_unknown(
+        &self,
+        hash: &StorePathHash,
+    ) -> (
+        Result<Option<(NarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
+        Vec<ResolveNarInfoEvent>,
+    ) {
+        let substituters = self.substituter_availability_index.query_all();
+
+        let (res, events) = self
+            .query_substituters(hash, substituters, self.tolerance)
+            .await;
+        let res = res.map(|outcome| {
+            outcome.map(|(substituter, nar_info)| {
+                let substituter = substituter.target().clone();
+                (nar_info, substituter)
+            })
+        });
+        (res, events)
+    }
+
+    async fn query_substituters(
+        &self,
+        hash: &StorePathHash,
+        substituters: Arc<Vec<Substituter>>,
+        tolerance: u64,
+    ) -> (
+        Result<Option<(Substituter, NarInfoData)>, ResolveNarInfoError>,
+        Vec<ResolveNarInfoEvent>,
+    ) {
+        let mut substituter_graces = HashMap::new();
+        for substituter in substituters.iter() {
+            substituter_graces.insert(substituter, substituter.grace(tolerance as i64));
+        }
+
+        let start = Instant::now();
+        let mut query_tracker = JoinSet::new();
+        let mut query_cancellers = HashMap::new();
+        let mut query_deadlines: DeadlineGroup<&Substituter> = DeadlineGroup::new();
+
+        for substituter in substituters.iter() {
+            let handle = query_tracker.spawn({
+                let provider = Arc::clone(&self.nar_info_provider);
+                let sub = substituter.clone();
+                let url = hash.on_substituter(substituter.target());
+                let timeout = sub.target().nar_info_timeout();
+                async move { (sub, provider.query_nar_info(&url, timeout).await) }
+            });
+            query_cancellers.insert(substituter, handle);
+        }
+
+        let mut has_error = false;
+        let mut events = Vec::new();
+        let mut optimal = None;
+        loop {
+            let query_res = tokio::select! {
+                Some(substituter) = query_deadlines.wait_earliest(), if !query_deadlines.is_empty() => {
+                    tracing::trace!(hash = %hash.value(), substituter = %substituter.url(), elapsed = ?start.elapsed(), "prune substituter query");
+                    if let Some(canceller) = query_cancellers.remove(substituter) {
+                        canceller.abort()
+                    };
+                    query_deadlines.remove(substituter);
+                    substituter_graces.remove(substituter);
+                    continue;
+                }
+                res = query_tracker.join_next() => res,
+            };
+
+            match query_res {
+                Some(Ok((substituter, Ok(outcome)))) => {
+                    query_cancellers.remove(&substituter);
+                    query_deadlines.remove(&substituter);
+                    let current_grace = substituter_graces.remove(&substituter).unwrap();
+                    if !substituter.is_normal() {
+                        let url = substituter.url().clone();
+                        events.push(ResolveNarInfoEvent::SubstituterSucceeded(url));
+                    }
+
+                    if let Some(data) = outcome {
+                        let current = NarInfoQueryCandidate {
+                            substituter,
+                            nar_info: data.original_data,
+                            grace: current_grace,
+                            latency: data.latency,
+                        };
+                        update_optimal_and_deadlines(
+                            current,
+                            &mut optimal,
+                            start,
+                            &mut query_deadlines,
+                            &substituter_graces,
+                            hash.value(),
+                        );
+                    }
+                }
+                Some(Ok((substituter, Err(e)))) => {
+                    if !self.ignore_query_error && matches!(e, QueryNarInfoError::Service { .. }) {
+                        has_error = true;
+                    }
+                    query_cancellers.remove(&substituter);
+                    query_deadlines.remove(&substituter);
+                    substituter_graces.remove(&substituter);
+                    let url = substituter.url().clone();
+                    match e {
+                        QueryNarInfoError::Offline { .. } => {
+                            events.push(ResolveNarInfoEvent::SubstituterOffline(url));
+                        }
+                        QueryNarInfoError::Service { .. } => {
+                            events.push(ResolveNarInfoEvent::SubstituterError(url));
+                        }
+                    }
+                }
+                Some(Err(_)) => (),
+                None => break,
+            }
+        }
+
+        match optimal {
+            Some(optimal) => (Ok(Some((optimal.substituter, optimal.nar_info))), events),
+            None if !has_error => (Ok(None), events),
+            None => (Err(ResolveNarInfoError::Fetch), events),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ResolveNarInfoEvent {
+    SubstituterSucceeded(Url),
+    SubstituterOffline(Url),
+    SubstituterError(Url),
+    NarFileLocated {
+        nar_file_key: NarFileKey,
+        location: NarFileLocation,
+    },
+}
+
+#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ResolveNarInfoError {
+    #[snafu(display("could not fetch narinfo"))]
+    Fetch,
+}
+
+struct NarInfoQueryCandidate {
+    substituter: Substituter,
+    nar_info: NarInfoData,
+    grace: i64,
+    latency: Duration,
+}
+
+impl NarInfoQueryCandidate {
+    fn calc_preference(&self) -> i64 {
+        self.grace - self.latency.as_millis() as i64
+    }
+}
+
+fn update_optimal_and_deadlines<'a>(
+    current: NarInfoQueryCandidate,
+    optimal: &mut Option<NarInfoQueryCandidate>,
+    start: Instant,
+    deadlines: &mut DeadlineGroup<&'a Substituter>,
+    graces: &HashMap<&'a Substituter, i64>,
+    hash: &str,
+) {
+    match optimal {
+        Some(prev) if prev.calc_preference() > current.calc_preference() => (),
+        _ => {
+            tracing::trace!(%hash, substituter = %current.substituter.url().value(), preference = %current.calc_preference(), latency = ?current.latency, elapsed = ?start.elapsed(), "update optimal candidate");
+            for (substituter, grace) in graces {
+                let max_latency = 0.max(grace - current.calc_preference()) as u64;
+                let deadline = start + Duration::from_millis(max_latency);
+                deadlines.insert_or_set_earlier(substituter, deadline);
+            }
+            *optimal = Some(current);
+        }
+    }
+}

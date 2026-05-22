@@ -7,9 +7,9 @@ use reqwest::{Client, StatusCode};
 use snafu::ResultExt;
 use tokio::sync::Semaphore;
 
-use crate::domain::nar::model::NarInfoData;
-use crate::domain::nar::port::error_ctx::{OfflineSnafu, ServiceSnafu};
-use crate::domain::nar::port::{NarInfoProvider, NarInfoQueryData, QueryNarInfoError};
+use crate::domain::nar_info::model::NarInfoData;
+use crate::domain::nar_info::port::error_ctx::{OfflineSnafu, ServiceSnafu};
+use crate::domain::nar_info::port::{NarInfoProvider, NarInfoQueryData, QueryNarInfoError};
 use crate::domain::substituter::model::Url;
 
 pub struct ReqwestNarInfoProvider {

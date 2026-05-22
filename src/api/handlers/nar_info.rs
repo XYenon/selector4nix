@@ -6,7 +6,7 @@ use axum::http::{Response, header};
 
 use crate::api::state::AppContext;
 use crate::application::{AppError, AppErrorKind};
-use crate::domain::nar::model::StorePathHash;
+use crate::domain::nar_info::model::StorePathHash;
 
 pub async fn get_nar_info(
     State(ctx): State<Arc<AppContext>>,
@@ -22,7 +22,7 @@ pub async fn get_nar_info(
         }
     };
 
-    let data = ctx.nar_resolution_usecase().get_nar_info(hash).await?;
+    let data = ctx.nar_info_resolution_usecase().get_nar_info(hash).await?;
     let response = Response::builder()
         .header(header::CONTENT_TYPE, "text/x-nix-narinfo")
         .body(Body::from(data.content().to_string()))

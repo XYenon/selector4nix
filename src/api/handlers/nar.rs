@@ -7,16 +7,18 @@ use futures::StreamExt;
 
 use crate::api::state::AppContext;
 use crate::application::AppError;
-use crate::domain::nar::model::NarFileName;
-use crate::domain::nar::port::NarStreamData;
+use crate::domain::nar_file::model::NarFileKey;
+use crate::domain::nar_info::model::NarFileName;
+use crate::domain::nar_info::port::NarStreamData;
 
 pub async fn get_nar(
     State(ctx): State<Arc<AppContext>>,
     Path(path): Path<String>,
 ) -> Result<Response<Body>, AppError> {
     let nar_file = NarFileName::new(path)?;
+    let key = NarFileKey::from_file_name(&nar_file);
 
-    let data = ctx.nar_streaming_usecase().stream_nar(&nar_file).await?;
+    let data = ctx.nar_file_streaming_usecase().stream_nar(key).await?;
     Ok(build_response(data))
 }
 
