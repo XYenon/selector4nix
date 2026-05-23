@@ -103,20 +103,23 @@ impl Substituter {
     ) -> (Substituter, Vec<UpdateSubstituterEvent>) {
         match probed_state {
             ProbedState::Normal => {
-                self.availability = self.availability.try_change_to_normal();
-                let events = match (self.is_normal(), periodic_probing) {
-                    (true, PeriodicProbingOption::Enabled) => vec![
-                        UpdateSubstituterEvent::NotifyAvailable,
-                        UpdateSubstituterEvent::ScheduleProbing(Some(
-                            now + Availability::REPROBING_PERIOD,
-                        )),
-                    ],
-                    (true, PeriodicProbingOption::None) => {
-                        vec![UpdateSubstituterEvent::NotifyAvailable]
-                    }
-                    (false, _) => Vec::new(),
-                };
-                (self, events)
+                if self.is_unavailable() {
+                    (self, Vec::new())
+                } else {
+                    self.availability = self.availability.try_change_to_maybe_ready();
+                    let events = match periodic_probing {
+                        PeriodicProbingOption::Enabled => vec![
+                            UpdateSubstituterEvent::NotifyAvailable,
+                            UpdateSubstituterEvent::ScheduleProbing(Some(
+                                now + Availability::REPROBING_PERIOD,
+                            )),
+                        ],
+                        PeriodicProbingOption::None => {
+                            vec![UpdateSubstituterEvent::NotifyAvailable]
+                        }
+                    };
+                    (self, events)
+                }
             }
             ProbedState::Offline => self.update_on_service_offline(now),
             ProbedState::ServiceError => self.update_on_service_error(now),
@@ -244,7 +247,7 @@ mod tests {
             now,
         );
 
-        assert!(result.is_normal());
+        assert!(!result.is_unavailable());
         assert_events_eq(
             events,
             vec![
