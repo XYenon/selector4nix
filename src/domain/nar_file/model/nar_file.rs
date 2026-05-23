@@ -8,31 +8,42 @@ use super::NarFileLocation;
 #[getset(get = "pub")]
 pub struct NarFileKey {
     nar_hash: String,
-    compression: String,
+    compression: Option<String>,
 }
 
 impl NarFileKey {
-    pub fn new(nar_hash: String, compression: String) -> Self {
+    pub fn new(nar_hash: String) -> Self {
         Self {
             nar_hash,
-            compression,
+            compression: None,
         }
     }
 
-    pub fn from_file_name(file: &NarFileName) -> Self {
-        let (prefix, suffix) = file
+    pub fn with_compression<V>(mut self, compression: V) -> Self
+    where
+        V: Into<Option<String>>,
+    {
+        self.compression = compression.into().filter(|c| !c.is_empty());
+        self
+    }
+
+    pub fn from_file_name(nar_file: &NarFileName) -> Self {
+        let (file_hash, suffix) = nar_file
             .value()
-            .split_once(".nar.")
-            .expect("NarFileName construction guarantees `.nar.` is present");
-        Self {
-            nar_hash: prefix.to_string(),
-            compression: suffix.to_string(),
-        }
+            .split_once(".nar")
+            .expect("`nar_file` should contains `\".nar\"`");
+        let compression = suffix.trim_start_matches(".");
+        Self::new(file_hash.to_string()).with_compression(compression.to_string())
     }
 
     pub fn to_file_name(&self) -> NarFileName {
-        NarFileName::new(format!("{}.nar.{}", self.nar_hash, self.compression))
-            .expect("valid NarFileName from NarFileKey")
+        if let Some(compression) = &self.compression {
+            NarFileName::new(format!("{}.nar.{}", self.nar_hash, compression))
+                .expect("converting `NarFileKey` to `NarFileName` should always be valid")
+        } else {
+            NarFileName::new(format!("{}.nar", self.nar_hash))
+                .expect("converting `NarFileKey` to `NarFileName` should always be valid")
+        }
     }
 }
 
