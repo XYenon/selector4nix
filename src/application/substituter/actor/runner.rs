@@ -7,7 +7,7 @@ use tokio::time::Instant;
 use crate::domain::substituter::index::SubstituterAvailabilityEvent;
 use crate::domain::substituter::model::Substituter;
 use crate::domain::substituter::port::{ProbeSubstituterError, SubstituterProbingProvider};
-use crate::domain::substituter::service::{SubstituterService, UpdateSubstituterEvent};
+use crate::domain::substituter::{SubstituterService, UpdateSubstituterEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SubstituterRequest {

@@ -4,9 +4,7 @@ use std::time::Duration;
 
 use selector4nix::domain::nar_info::model::{NarUrlRewriteOption, StorePathHash};
 use selector4nix::domain::nar_info::port::NarInfoQueryData;
-use selector4nix::domain::nar_info::service::{
-    NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent,
-};
+use selector4nix::domain::nar_info::{NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent};
 use selector4nix::domain::substituter::model::{Substituter, Url};
 use selector4nix::infrastructure::index::SubstituterAvailabilityIndexActor;
 

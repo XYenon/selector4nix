@@ -4,7 +4,7 @@ use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, Context, Empty
 use tokio::sync::oneshot::Sender as OneshotSender;
 
 use crate::domain::nar_info::model::{NarInfo, ProxyNarInfoData};
-use crate::domain::nar_info::service::{NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent};
+use crate::domain::nar_info::{NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent};
 
 #[derive(Debug)]
 pub enum NarInfoRequest {
