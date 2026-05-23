@@ -139,6 +139,7 @@ pub enum ProbedState {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::time::Duration;
 
     use crate::domain::substituter::model::{Availability, Priority, SubstituterMeta, Url};
@@ -152,13 +153,22 @@ mod tests {
         Substituter::new(meta, availability)
     }
 
+    fn assert_events_eq(
+        actual: impl IntoIterator<Item = UpdateSubstituterEvent>,
+        expected: impl IntoIterator<Item = UpdateSubstituterEvent>,
+    ) {
+        assert_eq!(
+            actual.into_iter().collect::<HashSet<_>>(),
+            expected.into_iter().collect::<HashSet<_>>(),
+        );
+    }
+
     #[test]
     fn update_on_service_successful_given_maybe_ready() {
         let substituter = make_substituter(Availability::MaybeReady { prev_failures: 0 });
         let (result, events) = substituter.update_on_service_successful();
         assert!(!result.is_unavailable());
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0], UpdateSubstituterEvent::NotifyAvailable);
+        assert_events_eq(events, vec![UpdateSubstituterEvent::NotifyAvailable]);
     }
 
     #[test]
@@ -169,15 +179,13 @@ mod tests {
         let (result, events) = substituter.update_on_service_error(now);
 
         assert!(result.is_unavailable());
-        assert_eq!(events.len(), 2);
-        assert!(matches!(
-            events[0],
-            UpdateSubstituterEvent::NotifyUnavailable
-        ));
-        assert!(matches!(
-            events[1],
-            UpdateSubstituterEvent::ScheduleRetryReady(t) if t == now + Duration::from_millis(500)
-        ));
+        assert_events_eq(
+            events,
+            vec![
+                UpdateSubstituterEvent::NotifyUnavailable,
+                UpdateSubstituterEvent::ScheduleRetryReady(now + Duration::from_millis(500)),
+            ],
+        );
     }
 
     #[test]
@@ -188,7 +196,6 @@ mod tests {
         let (result, events) = substituter.update_on_service_error(now);
 
         assert!(result.is_unavailable());
-        assert_eq!(events.len(), 2);
         assert!(matches!(
             result.availability(),
             Availability::ServiceError {
@@ -196,6 +203,13 @@ mod tests {
                 ..
             }
         ));
+        assert_events_eq(
+            events,
+            vec![
+                UpdateSubstituterEvent::NotifyUnavailable,
+                UpdateSubstituterEvent::ScheduleRetryReady(now + Duration::from_millis(4000)),
+            ],
+        );
     }
 
     #[test]
@@ -208,11 +222,7 @@ mod tests {
         let (result, events) = substituter.update_on_next_retry_ready();
 
         assert!(!result.is_unavailable());
-        assert_eq!(events.len(), 1);
-        assert!(matches!(
-            events[0],
-            UpdateSubstituterEvent::ScheduleProbing(None),
-        ));
+        assert_events_eq(events, vec![UpdateSubstituterEvent::ScheduleProbing(None)]);
     }
 
     #[test]
@@ -224,12 +234,13 @@ mod tests {
             substituter.update_on_probing_finished(ProbedState::Normal, true, now);
 
         assert!(result.is_normal());
-        assert_eq!(events.len(), 2);
-        assert!(matches!(events[0], UpdateSubstituterEvent::NotifyAvailable));
-        assert!(matches!(
-            events[1],
-            UpdateSubstituterEvent::ScheduleProbing(Some(_)),
-        ));
+        assert_events_eq(
+            events,
+            vec![
+                UpdateSubstituterEvent::NotifyAvailable,
+                UpdateSubstituterEvent::ScheduleProbing(Some(now + Availability::REPROBING_PERIOD)),
+            ],
+        );
     }
 
     #[test]
@@ -241,12 +252,13 @@ mod tests {
             substituter.update_on_probing_finished(ProbedState::Normal, true, now);
 
         assert!(result.is_normal());
-        assert_eq!(events.len(), 2);
-        assert!(matches!(events[0], UpdateSubstituterEvent::NotifyAvailable));
-        assert!(matches!(
-            events[1],
-            UpdateSubstituterEvent::ScheduleProbing(Some(_)),
-        ));
+        assert_events_eq(
+            events,
+            vec![
+                UpdateSubstituterEvent::NotifyAvailable,
+                UpdateSubstituterEvent::ScheduleProbing(Some(now + Availability::REPROBING_PERIOD)),
+            ],
+        );
     }
 
     #[test]
@@ -258,15 +270,15 @@ mod tests {
             substituter.update_on_probing_finished(ProbedState::Offline, true, now);
 
         assert!(result.is_unavailable());
-        assert_eq!(events.len(), 2);
-        assert!(matches!(
-            events[0],
-            UpdateSubstituterEvent::NotifyUnavailable,
-        ));
-        assert!(matches!(
-            events[1],
-            UpdateSubstituterEvent::ScheduleRetryReady(_),
-        ));
+        assert_events_eq(
+            events,
+            vec![
+                UpdateSubstituterEvent::NotifyUnavailable,
+                UpdateSubstituterEvent::ScheduleRetryReady(
+                    now + Availability::OFFLINE_RETRY_PERIOD,
+                ),
+            ],
+        );
     }
 
     #[test]
@@ -278,14 +290,12 @@ mod tests {
             substituter.update_on_probing_finished(ProbedState::ServiceError, true, now);
 
         assert!(result.is_unavailable());
-        assert_eq!(events.len(), 2);
-        assert!(matches!(
-            events[0],
-            UpdateSubstituterEvent::NotifyUnavailable,
-        ));
-        assert!(matches!(
-            events[1],
-            UpdateSubstituterEvent::ScheduleRetryReady(_),
-        ));
+        assert_events_eq(
+            events,
+            vec![
+                UpdateSubstituterEvent::NotifyUnavailable,
+                UpdateSubstituterEvent::ScheduleRetryReady(now + Duration::from_millis(4000)),
+            ],
+        );
     }
 }
