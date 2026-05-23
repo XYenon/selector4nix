@@ -4,4 +4,4 @@ pub mod port;
 
 mod service;
 
-pub use service::{SubstituterService, UpdateSubstituterEvent};
+pub use service::SubstituterService;

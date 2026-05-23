@@ -4,10 +4,10 @@ use std::time::Duration;
 use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, AnyAddress, Context};
 use tokio::time::Instant;
 
+use crate::domain::substituter::SubstituterService;
 use crate::domain::substituter::index::SubstituterAvailabilityEvent;
-use crate::domain::substituter::model::Substituter;
+use crate::domain::substituter::model::{Substituter, UpdateSubstituterEvent};
 use crate::domain::substituter::port::{ProbeSubstituterError, SubstituterProbingProvider};
-use crate::domain::substituter::{SubstituterService, UpdateSubstituterEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SubstituterRequest {
@@ -114,28 +114,24 @@ impl Actor for SubstituterActor {
 
     async fn on_request(
         &mut self,
-        state: Self::State,
+        substituter: Self::State,
         request: Self::Request,
     ) -> Option<Self::State> {
         match request {
             SubstituterRequest::ServiceSuccessful => {
-                let (substituter, events) =
-                    self.substituter_service.update_on_service_successful(state);
+                let (substituter, events) = substituter.update_on_service_successful();
                 self.exec_all_events(&substituter, events).await;
                 Some(substituter)
             }
             SubstituterRequest::ServiceOffline => {
                 let now = Instant::now();
-                let (substituter, events) = self
-                    .substituter_service
-                    .update_on_service_offline(state, now);
+                let (substituter, events) = substituter.update_on_service_offline(now);
                 self.exec_all_events(&substituter, events).await;
                 Some(substituter)
             }
             SubstituterRequest::ServiceError => {
                 let now = Instant::now();
-                let (substituter, events) =
-                    self.substituter_service.update_on_service_error(state, now);
+                let (substituter, events) = substituter.update_on_service_error(now);
                 self.exec_all_events(&substituter, events).await;
                 Some(substituter)
             }
@@ -144,21 +140,20 @@ impl Actor for SubstituterActor {
 
     async fn on_internal(
         &mut self,
-        state: Self::State,
+        substituter: Self::State,
         internal: Self::Internal,
     ) -> Option<Self::State> {
         match internal {
             SubstituterInternal::NextRetryReady => {
-                let (substituter, events) =
-                    self.substituter_service.update_on_next_retry_ready(state);
+                let (substituter, events) = substituter.update_on_next_retry_ready();
                 self.exec_all_events(&substituter, events).await;
                 Some(substituter)
             }
             SubstituterInternal::ProbingFinished(res) => {
                 let now = Instant::now();
-                let (substituter, events) = self
-                    .substituter_service
-                    .update_on_probing_finished(state, res, now);
+                let (substituter, events) =
+                    self.substituter_service
+                        .update_on_probing_finished(substituter, res, now);
                 self.exec_all_events(&substituter, events).await;
                 Some(substituter)
             }

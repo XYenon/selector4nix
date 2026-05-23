@@ -21,14 +21,14 @@ impl Availability {
     pub const OFFLINE_RETRY_PERIOD: Duration = Duration::from_secs(30);
     pub const REPROBING_PERIOD: Duration = Duration::from_secs(30);
 
-    pub fn change_to_normal(self) -> Self {
+    pub fn try_change_to_normal(self) -> Self {
         match self {
             Self::MaybeReady { .. } => Self::Normal,
             otherwise => otherwise,
         }
     }
 
-    pub fn change_to_offline(self, now: Instant) -> Self {
+    pub fn try_change_to_offline(self, now: Instant) -> Self {
         match self {
             Self::Normal => Self::Offline { detected_at: now },
             s @ Self::Offline { .. } => s,
@@ -37,7 +37,7 @@ impl Availability {
         }
     }
 
-    pub fn change_to_service_error(self, now: Instant) -> Self {
+    pub fn try_change_to_service_error(self, now: Instant) -> Self {
         match self {
             Self::Normal => Self::ServiceError {
                 detected_at: now,
@@ -52,7 +52,7 @@ impl Availability {
         }
     }
 
-    pub fn change_to_maybe_ready(self) -> Self {
+    pub fn try_change_to_maybe_ready(self) -> Self {
         match self {
             Self::Offline { .. } => Self::MaybeReady { prev_failures: 0 },
             Self::ServiceError { prev_failures, .. } => Self::MaybeReady { prev_failures },
@@ -64,7 +64,7 @@ impl Availability {
         match &self {
             Self::Offline { detected_at } => {
                 if *detected_at + Self::OFFLINE_RETRY_PERIOD <= now {
-                    (true, self.change_to_maybe_ready())
+                    (true, self.try_change_to_maybe_ready())
                 } else {
                     (false, self)
                 }
@@ -74,7 +74,7 @@ impl Availability {
                 prev_failures,
             } => {
                 if *detected_at + Self::calc_retry_duration(*prev_failures) <= now {
-                    (true, self.change_to_maybe_ready())
+                    (true, self.try_change_to_maybe_ready())
                 } else {
                     (false, self)
                 }
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn change_to_service_error_succeeds_from_normal() {
         let now = Instant::now();
-        let result = Availability::Normal.change_to_service_error(now);
+        let result = Availability::Normal.try_change_to_service_error(now);
         assert_eq!(
             result,
             Availability::ServiceError {
@@ -134,7 +134,7 @@ mod tests {
             detected_at: now,
             prev_failures: 1,
         };
-        let result = state.change_to_service_error(now);
+        let result = state.try_change_to_service_error(now);
         assert_eq!(
             result,
             Availability::ServiceError {
