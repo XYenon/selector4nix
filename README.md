@@ -10,12 +10,15 @@ A Nix substituter proxy with parallel cache queries and latency-aware selection.
 - Selects the fastest responding substituter based on latency and priority
 - Automatically detects and skips unavailable substituters, retrying them with exponential backoff
 - Continuously probes substituters to detect failures early and verify recovery
+- Proxy private cache substituters with additional credentials
 
 Note that `selector4nix` only intends to work as a proxy rather than a full-featured cache substituter. NAR files are streamed directly from the best substituter without being cached locally. However, it does cache `.narinfo` files for better responsiveness.
 
 The recommended way to use `selector4nix` is deploying it locally on each host. Since no large NAR file caching is used, `selector4nix` is pretty lightweight in terms of both memory footprint and CPU usage. In contrast, hosting `selector4nix` on a central node in your LAN for other machines doesn't scale well.
 
 ## Configuration
+
+### General
 
 `selector4nix` reads a TOML configuration file from the first of these locations:
 
@@ -45,6 +48,26 @@ storage_url = "https://garnix-cache.com/" # Garnix doesn't serve NAR files on ht
 ```
 
 For NixOS, nix-darwin, and Home Manager users, it is recommended to use the modules provided by this project for declarative setup and configuration.
+
+### Credentials
+
+`selector4nix` can optionally read a TOML credentials file for authenticating with private caches. It is loaded from the first of these locations:
+
+1. The path specified by the `--credential-file` command line argument
+2. The path specified by the `SELECTOR4NIX_CREDENTIAL_FILE` environment variable
+3. `./credentials.toml` in the current directory
+4. `/etc/selector4nix/credentials.toml`
+
+If no credentials file is found, all upstream requests are made without authentication. Credentials are only used for `/nix-cache-info` lookups and `.narinfo` queries; NAR file downloads typically rely on pre-signed URLs.
+
+An example credentials file is demonstrated below. For a complete reference, see [`docs/credentials.md`](/docs/credentials.md). An annotated example credentials file is also available at [`docs/credentials.example.toml`](/docs/credentials.example.toml).
+
+```toml
+[[credentials]]
+url = "https://my.private-cache.com/"
+login = "my-username"
+secret = "my-secret"
+```
 
 ## Usage
 
