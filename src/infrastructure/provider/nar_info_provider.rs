@@ -11,19 +11,27 @@ use crate::domain::nar_info::model::UpstreamNarInfoData;
 use crate::domain::nar_info::port::error_ctx::{OfflineSnafu, ServiceSnafu};
 use crate::domain::nar_info::port::{NarInfoProvider, NarInfoQueryData, QueryNarInfoError};
 use crate::domain::substituter::model::Url;
+use crate::infrastructure::config::AppCredential;
 
 pub struct ReqwestNarInfoProvider {
     client: Client,
     default_timeout: Duration,
     concurrency: Arc<Semaphore>,
+    credentials: Arc<AppCredential>,
 }
 
 impl ReqwestNarInfoProvider {
-    pub fn new(client: Client, default_timeout: Duration, concurrency: Arc<Semaphore>) -> Self {
+    pub fn new(
+        client: Client,
+        default_timeout: Duration,
+        concurrency: Arc<Semaphore>,
+        credentials: Arc<AppCredential>,
+    ) -> Self {
         Self {
             client,
             default_timeout,
             concurrency,
+            credentials,
         }
     }
 }
@@ -41,6 +49,12 @@ impl NarInfoProvider for ReqwestNarInfoProvider {
 
         let timeout = timeout.unwrap_or(self.default_timeout);
         let request = self.client.get(url.value()).timeout(timeout);
+
+        let request = if let Some(credential) = self.credentials.lookup(url) {
+            request.basic_auth(credential.login.clone(), credential.secret.clone())
+        } else {
+            request
+        };
 
         let start = Instant::now();
         let response = match request.send().await {

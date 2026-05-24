@@ -2,9 +2,10 @@
 
 `selector4nix` reads a TOML configuration file from the first of these locations:
 
-1. The path specified by the `SELECTOR4NIX_CONFIG_FILE` environment variable
-2. `./selector4nix.toml` in the current directory
-3. `/etc/selector4nix/selector4nix.toml`
+1. The path specified by the `--config-file` command line argument
+2. The path specified by the `SELECTOR4NIX_CONFIG_FILE` environment variable
+3. `./selector4nix.toml` in the current directory
+4. `/etc/selector4nix/selector4nix.toml`
 
 ## `server`
 
@@ -95,7 +96,7 @@ Controls how the `URL` field is rewritten when `rewrite_nar_url` is enabled. Onl
 - `"self"`: Rewrite to a relative path (e.g. `URL: nar/<hash>.nar.xz`) so that NAR file requests go through `selector4nix`. This allows transparent fallback to other substituters when the original one becomes unavailable.
 - `"upstream"`: Rewrite to the winning upstream substituter's storage URL (e.g. `URL: https://cache.nixos.org/nar/<hash>.nar.xz`). This normalizes URLs to a consistent upstream address rather than preserving whatever format each substituter returns. NAR file requests will go directly to the upstream substituter, bypassing `selector4nix`.
 
-Note that the `URL` field in NAR info is opaque and varies across substituters — a given store path may map to different NAR URLs on different substituters, so fallback is not guaranteed to succeed when the NAR files are not identical across substituters.
+Note that the `URL` field in NAR info is opaque and varies across substituters: a given store path may map to different NAR URLs on different substituters, so fallback is not guaranteed to succeed when the NAR files are not identical across substituters.
 
 ## `cache_info`
 
@@ -171,7 +172,7 @@ Base URL of the upstream substituter.
 ### `substituters[].storage_url`
 
 - Type: URL
-- Default: `<url>/nar/`
+- Default: `"{substituters[].url}/nar/""`
 
 Override the base URL used for NAR file downloads.
 
@@ -184,12 +185,14 @@ Priority of this substituter. Higher values mean lower priority.
 
 ### `substituters[].nar_info_timeout_secs`
 
-- Type: Natural
+- Type: Natural | None
+- Default: none
 
 Per-substituter override for NAR info lookup timeout in seconds. When unset, falls back to `network.nar_info_timeout_secs`.
 
 ### `substituters[].nar_timeout_secs`
 
-- Type: Natural
+- Type: Natural | None
+- Default: none
 
 Per-substituter override for NAR file download timeout in seconds. When unset, falls back to `network.nar_timeout_secs`.

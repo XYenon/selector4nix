@@ -17,7 +17,7 @@ use selector4nix::domain::nar_info::NarInfoService;
 use selector4nix::domain::nar_info::model::{NarInfo, StorePathHash};
 use selector4nix::domain::substituter::SubstituterService;
 use selector4nix::domain::substituter::model::{Availability, Substituter, SubstituterMeta};
-use selector4nix::infrastructure::config::AppConfiguration;
+use selector4nix::infrastructure::config::{AppConfiguration, AppCredential};
 use selector4nix::infrastructure::index::*;
 use selector4nix::infrastructure::provider::*;
 use selector4nix_actor::actor::Address;
@@ -92,7 +92,10 @@ pub fn init_logger(
     Ok(())
 }
 
-pub async fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppContext>> {
+pub async fn init_context(
+    config: &AppConfiguration,
+    credentials: Arc<AppCredential>,
+) -> AnyhowResult<Arc<AppContext>> {
     let http_client = Client::builder()
         .user_agent(format!(
             "curl/8.7.1 Nix/2.24.11 {}/{}",
@@ -109,12 +112,14 @@ pub async fn init_context(config: &AppConfiguration) -> AnyhowResult<Arc<AppCont
         http_client.clone(),
         config.network.nar_info_timeout,
         concurrency.clone(),
+        credentials.clone(),
     ));
 
     let nar_info_provider = Arc::new(ReqwestNarInfoProvider::new(
         http_client.clone(),
         config.network.nar_info_timeout,
         concurrency.clone(),
+        credentials.clone(),
     ));
 
     let nar_stream_provider = Arc::new(ReqwestNarStreamProvider::new(http_client, concurrency));

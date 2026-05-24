@@ -6,7 +6,7 @@ use anyhow::{Context, Error as AnyhowError, Result as AnyhowResult};
 
 use crate::domain::nar_info::model::NarUrlRewriteOption;
 use crate::domain::substituter::model::{PeriodicProbingOption, Priority, Url};
-use crate::infrastructure::config::raw::{
+use crate::infrastructure::config::general_raw::{
     AppRawConfiguration, CacheInfoRawConfiguration, CacheRawConfiguration, NetworkRawConfiguration,
     ProxyRawConfiguration, ServerRawConfiguration, SubstituterRawConfiguration,
 };
@@ -44,9 +44,10 @@ impl AppConfiguration {
             tracing::info!(path = %path.display(), "use configuration file from current directory");
             path
         } else if let Ok(path) = Path::new("/etc/selector4nix/selector4nix.toml").canonicalize() {
-            tracing::info!(path = %path.display(), "use configuration file from /etc");
+            tracing::info!(path = %path.display(), "use configuration file from `/etc`");
             path
         } else {
+            tracing::error!("could not find any configuration file");
             return Err(anyhow::anyhow!("could not find any configuration file"));
         };
 

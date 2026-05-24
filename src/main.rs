@@ -8,7 +8,7 @@ use clap::Parser;
 use tokio::net::TcpListener;
 
 use selector4nix::api::{AppContext, build_router};
-use selector4nix::infrastructure::config::AppConfiguration;
+use selector4nix::infrastructure::config::{AppConfiguration, AppCredential};
 
 use crate::cli::{Cli, Commands};
 
@@ -23,9 +23,19 @@ async fn main() -> AnyhowResult<()> {
         AppConfiguration::load()?
     };
 
+    let credentials = if let Some(path) = &cli.credential_file {
+        let credential = AppCredential::load_from(path)?;
+        Arc::new(credential)
+    } else {
+        let credential = AppCredential::load()
+            .transpose()?
+            .unwrap_or(AppCredential::empty());
+        Arc::new(credential)
+    };
+
     match cli.command.unwrap_or(Commands::Serve) {
         Commands::Serve => {
-            let context = bootstrap::init_context(&config).await?;
+            let context = bootstrap::init_context(&config, credentials).await?;
             serve(config, context).await
         }
         Commands::Check => {

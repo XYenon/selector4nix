@@ -10,19 +10,27 @@ use tokio::sync::Semaphore;
 use crate::domain::substituter::model::SubstituterMeta;
 use crate::domain::substituter::port::error_ctx::{OfflineSnafu, ServiceSnafu};
 use crate::domain::substituter::port::{ProbeSubstituterError, SubstituterProbingProvider};
+use crate::infrastructure::config::AppCredential;
 
 pub struct ReqwestSubstituterProbingProvider {
     client: Client,
     default_timeout: Duration,
     concurrency: Arc<Semaphore>,
+    credentials: Arc<AppCredential>,
 }
 
 impl ReqwestSubstituterProbingProvider {
-    pub fn new(client: Client, default_timeout: Duration, concurrency: Arc<Semaphore>) -> Self {
+    pub fn new(
+        client: Client,
+        default_timeout: Duration,
+        concurrency: Arc<Semaphore>,
+        credentials: Arc<AppCredential>,
+    ) -> Self {
         Self {
             client,
             default_timeout,
             concurrency,
+            credentials,
         }
     }
 }
@@ -42,6 +50,12 @@ impl SubstituterProbingProvider for ReqwestSubstituterProbingProvider {
             .nar_info_timeout()
             .unwrap_or(self.default_timeout);
         let request = self.client.get(url.value()).timeout(timeout);
+
+        let request = if let Some(credential) = self.credentials.lookup(&url) {
+            request.basic_auth(credential.login.clone(), credential.secret.clone())
+        } else {
+            request
+        };
 
         let response = match request.send().await {
             Ok(response) => response,
