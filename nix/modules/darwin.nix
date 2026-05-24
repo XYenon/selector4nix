@@ -21,10 +21,15 @@ in
     (lib.mkIf cfg.enable {
       launchd.daemons.selector4nix = {
         command = "${cfg.package}/bin/selector4nix --no-log-timestamp";
+
         environment = {
           SELECTOR4NIX_CONFIG_FILE = "${configFile}";
           RUST_LOG = "selector4nix=${cfg.logLevel}";
+        }
+        // lib.optionalAttrs (cfg.credentialFile != null) {
+          SELECTOR4NIX_CREDENTIAL_FILE = "${cfg.credentialFile}";
         };
+
         serviceConfig = {
           Label = "cc.starryreverie.selector4nix";
           KeepAlive = true;
