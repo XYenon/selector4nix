@@ -20,7 +20,7 @@ async fn main() -> AnyhowResult<()> {
     let repeat = paths.repeat;
 
     let fixtures = TestFixtures::new(count, seed);
-    let mut shared = SharedContext::init(fixtures, &paths)?;
+    let mut shared = SharedContext::init(fixtures, &paths).await?;
     eprintln!("shared context ready. populated {count} files (seed=`{seed}`, repeat=`{repeat}`)");
 
     let mut seed_index = 0usize;

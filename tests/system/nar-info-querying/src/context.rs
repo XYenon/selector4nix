@@ -40,7 +40,7 @@ pub struct ProxyInstance {
 }
 
 impl SharedContext {
-    pub fn init(mut fixtures: TestFixtures, paths: &ResolvedPaths) -> AnyhowResult<Self> {
+    pub async fn init(mut fixtures: TestFixtures, paths: &ResolvedPaths) -> AnyhowResult<Self> {
         let tempdir = TempDir::new().context("failed to create temp directory")?;
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&cache_dir).context("failed to create cache directory")?;
@@ -54,6 +54,8 @@ impl SharedContext {
             .timeout(Duration::from_secs(10))
             .build()
             .context("failed to build HTTP client")?;
+
+        wait_nix_serve_ready(&client, &cache_dir, upstream_port).await?;
 
         Ok(Self {
             _tempdir: tempdir,
@@ -116,6 +118,47 @@ url = "http://127.0.0.1:{upstream_port}/"
 impl ProxyInstance {
     pub fn proxy_base_url(&self) -> &str {
         &self.proxy_base_url
+    }
+}
+
+async fn wait_nix_serve_ready(
+    client: &Client,
+    cache_dir: &Path,
+    port: u16,
+) -> AnyhowResult<()> {
+    let first_hash = std::fs::read_dir(cache_dir)
+        .context("failed to read cache dir")?
+        .filter_map(|e| e.ok())
+        .find(|e| {
+            e.path()
+                .extension()
+                .is_some_and(|ext| ext == "narinfo")
+        })
+        .map(|e| e.path());
+
+    let Some(narinfo_path) = first_hash else {
+        bail!("no .narinfo files found in cache directory");
+    };
+    let stem = narinfo_path
+        .file_stem()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let probe_url = format!("http://127.0.0.1:{port}/{stem}.narinfo");
+    let start = Instant::now();
+    loop {
+        match client.get(&probe_url).send().await {
+            Ok(resp) if resp.status().is_success() => return Ok(()),
+            _ => {
+                if start.elapsed() > READINESS_TIMEOUT {
+                    bail!(
+                        "`nix-serve` did not become ready within {READINESS_TIMEOUT:?} (probed `{stem}`)"
+                    );
+                }
+                tokio::time::sleep(POLL_INTERVAL).await;
+            }
+        }
     }
 }
 
