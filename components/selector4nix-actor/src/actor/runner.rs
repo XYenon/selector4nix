@@ -1,7 +1,8 @@
 use std::future::Future;
 use std::time::Duration;
 
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, Receiver as MpscReceiver, Sender as MpscSender};
+use tokio::sync::watch::{self, Receiver as WatchReceiver, Sender as WatchSender};
 use tokio::task::JoinSet;
 
 pub trait Actor: Send {
@@ -33,6 +34,7 @@ pub trait Actor: Send {
                 };
             }
             self.on_shutdown().await;
+            let _ = self.context().terminated.send(true);
         });
     }
 
@@ -73,20 +75,23 @@ pub trait Actor: Send {
 }
 
 pub struct Context<R, I> {
-    requests: Receiver<R>,
+    requests: MpscReceiver<R>,
     internal: JoinSet<I>,
+    terminated: WatchSender<bool>,
 }
 
 impl<R, I> Context<R, I> {
     pub const DEFAULT_REQUESTER_CAPACITY: usize = 64;
 
-    pub fn new(num_requests: usize) -> (Sender<R>, Self) {
+    pub fn new(num_requests: usize) -> (MpscSender<R>, WatchReceiver<bool>, Self) {
         let (sender, requests) = mpsc::channel(num_requests.max(1));
+        let (terminated, terminated_rx) = watch::channel(false);
         let context = Context {
             requests,
             internal: JoinSet::new(),
+            terminated,
         };
-        (sender, context)
+        (sender, terminated_rx, context)
     }
 }
 
@@ -119,8 +124,8 @@ mod tests {
     }
 
     impl CounterActor {
-        fn new(init: i32) -> (Sender<CounterActorRequest>, Self) {
-            let (sender, context) = Context::new(16);
+        fn new(init: i32) -> (MpscSender<CounterActorRequest>, Self) {
+            let (sender, _, context) = Context::new(16);
             let actor = Self {
                 context,
                 init: Some(init),

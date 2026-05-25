@@ -1,6 +1,7 @@
 use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::sync::mpsc::{self, Receiver as MpscReceiver, Sender as MpscSender};
 use tokio::sync::oneshot::{self, Sender as OneshotSender};
+use tokio::sync::watch::{self, Receiver as WatchReceiver, Sender as WatchSender};
 
 use crate::actor::Actor;
 
@@ -10,9 +11,9 @@ pub struct Address<A: Actor> {
 }
 
 impl<A: Actor> Address<A> {
-    pub fn mock() -> (Self, MpscReceiver<A::Request>) {
-        let (inner, receiver) = AnyAddress::mock();
-        (Self { inner }, receiver)
+    pub fn mock() -> (Self, MpscReceiver<A::Request>, WatchSender<bool>) {
+        let (inner, receiver, terminated_tx) = AnyAddress::mock();
+        (inner.into(), receiver, terminated_tx)
     }
 
     pub fn erased(self) -> AnyAddress<A::Request> {
@@ -45,6 +46,14 @@ impl<A: Actor> Address<A> {
         self.inner.is_closed()
     }
 
+    pub fn closed_listener(&self) -> WatchReceiver<bool> {
+        self.inner.closed_listener()
+    }
+
+    pub async fn wait_closed(self) {
+        self.inner.wait_closed().await;
+    }
+
     pub fn is_same(&self, other: &Self) -> bool {
         self.inner.is_same(&other.inner)
     }
@@ -66,23 +75,27 @@ impl<A: Actor> PartialEq for Address<A> {
 
 impl<A: Actor> Eq for Address<A> {}
 
-impl<A: Actor> From<MpscSender<A::Request>> for Address<A> {
-    fn from(sender: MpscSender<A::Request>) -> Self {
-        Self {
-            inner: AnyAddress::from(sender),
-        }
+impl<A: Actor> From<AnyAddress<A::Request>> for Address<A> {
+    fn from(inner: AnyAddress<A::Request>) -> Self {
+        Self { inner }
     }
 }
 
 #[derive(Debug)]
 pub struct AnyAddress<R> {
     sender: MpscSender<R>,
+    terminated: WatchReceiver<bool>,
 }
 
 impl<R> AnyAddress<R> {
-    pub fn mock() -> (Self, MpscReceiver<R>) {
+    pub fn new(sender: MpscSender<R>, terminated: WatchReceiver<bool>) -> Self {
+        Self { sender, terminated }
+    }
+
+    pub fn mock() -> (Self, MpscReceiver<R>, WatchSender<bool>) {
         let (sender, receiver) = mpsc::channel(64);
-        (sender.into(), receiver)
+        let (terminated_tx, terminated) = watch::channel(false);
+        (AnyAddress::new(sender, terminated), receiver, terminated_tx)
     }
 
     pub async fn tell(&self, request: R) -> Result<(), TellError<R>> {
@@ -127,6 +140,22 @@ impl<R> AnyAddress<R> {
         self.sender.is_closed()
     }
 
+    pub fn closed_listener(&self) -> WatchReceiver<bool> {
+        self.terminated.clone()
+    }
+
+    pub async fn wait_closed(mut self) {
+        drop(self.sender);
+        loop {
+            if *self.terminated.borrow_and_update() {
+                break;
+            }
+            if self.terminated.changed().await.is_err() {
+                break;
+            }
+        }
+    }
+
     pub fn is_same(&self, other: &Self) -> bool {
         self.sender.same_channel(&other.sender)
     }
@@ -136,6 +165,7 @@ impl<R> Clone for AnyAddress<R> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
+            terminated: self.terminated.clone(),
         }
     }
 }
@@ -147,12 +177,6 @@ impl<R> PartialEq for AnyAddress<R> {
 }
 
 impl<R> Eq for AnyAddress<R> {}
-
-impl<R> From<MpscSender<R>> for AnyAddress<R> {
-    fn from(sender: MpscSender<R>) -> Self {
-        Self { sender }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TellError<T>(pub T);
