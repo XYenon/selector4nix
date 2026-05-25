@@ -32,6 +32,7 @@ pub trait Actor: Send {
                     },
                 };
             }
+            self.on_shutdown().await;
         });
     }
 
@@ -52,8 +53,7 @@ pub trait Actor: Send {
         async { Some(state) }
     }
 
-    fn on_shutdown(&mut self, state: Self::State) -> impl Future<Output = ()> + Send {
-        let _unused = state;
+    fn on_shutdown(&mut self) -> impl Future<Output = ()> + Send {
         async {}
     }
 
