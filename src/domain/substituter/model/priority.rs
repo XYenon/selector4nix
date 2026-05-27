@@ -14,6 +14,10 @@ impl Priority {
     pub fn value(&self) -> u32 {
         self.0.into()
     }
+
+    pub fn grace(&self, tolerance: i64) -> i64 {
+        -(tolerance * self.value() as i64)
+    }
 }
 
 #[derive(Snafu, Debug, Clone, Copy, PartialEq, Eq)]

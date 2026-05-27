@@ -107,7 +107,7 @@ impl NarInfoService {
     ) {
         let mut substituter_graces = HashMap::new();
         for substituter in substituters.iter() {
-            substituter_graces.insert(substituter, substituter.grace(tolerance as i64));
+            substituter_graces.insert(substituter, substituter.priority().grace(tolerance as i64));
         }
 
         let start = Instant::now();
