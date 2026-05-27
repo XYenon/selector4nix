@@ -1,13 +1,11 @@
 use std::sync::Arc;
-use std::time::Duration;
 
-use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, AnyAddress, Context};
+use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, Context};
 use tokio::time::Instant;
 
-use crate::domain::substituter::SubstituterService;
-use crate::domain::substituter::index::{SubstituterAvailabilityEvent, SubstituterCandidate};
 use crate::domain::substituter::model::{Substituter, UpdateSubstituterEvent};
 use crate::domain::substituter::port::{ProbeSubstituterError, SubstituterProbingProvider};
+use crate::domain::substituter::{SubstituterRepository, SubstituterService};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SubstituterRequest {
@@ -26,7 +24,7 @@ pub struct SubstituterActor {
     context: Context<SubstituterRequest, SubstituterInternal>,
     substituter_service: Arc<SubstituterService>,
     substituter_probing_provider: Arc<dyn SubstituterProbingProvider>,
-    availability_index_pub: AnyAddress<SubstituterAvailabilityEvent>,
+    substituter_repository: Arc<dyn SubstituterRepository>,
 }
 
 impl SubstituterActor {
@@ -34,14 +32,14 @@ impl SubstituterActor {
         init: Option<Substituter>,
         substituter_service: Arc<SubstituterService>,
         substituter_probing_provider: Arc<dyn SubstituterProbingProvider>,
-        availability_index_pub: AnyAddress<SubstituterAvailabilityEvent>,
+        substituter_repository: Arc<dyn SubstituterRepository>,
     ) -> ActorPre<Self> {
         ActorPreBuilder::inject(|context| Self {
             init,
             context,
             substituter_service,
             substituter_probing_provider,
-            availability_index_pub,
+            substituter_repository,
         })
     }
 
@@ -58,7 +56,7 @@ impl SubstituterActor {
     async fn exec_event(&mut self, substituter: &Substituter, event: UpdateSubstituterEvent) {
         match event {
             UpdateSubstituterEvent::ScheduleRetryReady(instant) => {
-                self.dispatch_internal(Duration::ZERO, async move {
+                self.dispatch_internal(std::time::Duration::ZERO, async move {
                     tokio::time::sleep_until(instant).await;
                     SubstituterInternal::NextRetryReady
                 });
@@ -66,7 +64,7 @@ impl SubstituterActor {
             UpdateSubstituterEvent::ScheduleProbing(instant) => {
                 let substituter = substituter.target().clone();
                 let provider = Arc::clone(&self.substituter_probing_provider);
-                self.dispatch_internal(Duration::ZERO, async move {
+                self.dispatch_internal(std::time::Duration::ZERO, async move {
                     if let Some(instant) = instant {
                         tokio::time::sleep_until(instant).await;
                     }
@@ -78,14 +76,11 @@ impl SubstituterActor {
                 let url = substituter.url().clone();
                 let prev_failures = substituter.prev_failures();
                 tracing::warn!(%url, %prev_failures, "substituter became unavailable");
-                let event = SubstituterAvailabilityEvent::BecameUnavailable(url);
-                let _ = self.availability_index_pub.tell(event).await;
+                self.substituter_repository.save(substituter.clone()).await;
             }
             UpdateSubstituterEvent::NotifyAvailable => {
-                let substituter = SubstituterCandidate::from(substituter);
-                tracing::debug!(url = %substituter.url(), "substituter became or stayed available after probing");
-                let event = SubstituterAvailabilityEvent::BecameAvailable(substituter);
-                let _ = self.availability_index_pub.tell(event).await;
+                tracing::debug!(url = %substituter.target().url(), "substituter became or stayed available after probing");
+                self.substituter_repository.save(substituter.clone()).await;
             }
         }
     }

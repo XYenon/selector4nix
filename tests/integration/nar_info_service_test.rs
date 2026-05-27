@@ -5,9 +5,9 @@ use std::time::Duration;
 use selector4nix::domain::nar_info::model::{NarUrlRewriteOption, StorePathHash};
 use selector4nix::domain::nar_info::port::NarInfoQueryData;
 use selector4nix::domain::nar_info::{NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent};
-use selector4nix::domain::substituter::index::SubstituterCandidate;
+use selector4nix::domain::substituter::SubstituterRepository;
 use selector4nix::domain::substituter::model::{Substituter, Url};
-use selector4nix::infrastructure::index::SubstituterAvailabilityIndexActor;
+use selector4nix::infrastructure::repository::InMemorySubstituterRepository;
 
 use crate::fixture::{nar_file, nar_info, substituter};
 use crate::mock::nar_info_provider::MockNarInfoProvider;
@@ -43,19 +43,16 @@ async fn run_test(
         }
     });
 
-    let (avail_index_actor, avail_index) = SubstituterAvailabilityIndexActor::new(
-        env.substituters
-            .into_iter()
-            .map(SubstituterCandidate::from)
-            .collect(),
-    );
-    avail_index_actor.run();
+    let repo = Arc::new(InMemorySubstituterRepository::new());
+    for sub in env.substituters.iter() {
+        repo.save(sub.clone()).await;
+    }
 
     let nar_info_provider = MockNarInfoProvider::new(env.nar_info_entries.into_iter());
 
     let nar_resolution_service = NarInfoService::new(
         Arc::new(nar_info_provider),
-        Arc::new(avail_index),
+        repo,
         NarUrlRewriteOption::ToSelf,
         env.tolerance,
         env.ignore_query_error,

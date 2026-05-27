@@ -11,12 +11,12 @@ use crate::domain::nar_info::model::{
     NarFileName, NarInfoResolution, NarUrlRewriteOption, StorePathHash, UpstreamNarInfoData,
 };
 use crate::domain::nar_info::port::{NarInfoProvider, QueryNarInfoError};
-use crate::domain::substituter::index::{SubstituterAvailabilityIndex, SubstituterCandidate};
 use crate::domain::substituter::model::{SubstituterMeta, Url};
+use crate::domain::substituter::{SubstituterCandidate, SubstituterRepository};
 
 pub struct NarInfoService {
     nar_info_provider: Arc<dyn NarInfoProvider>,
-    substituter_availability_index: Arc<dyn SubstituterAvailabilityIndex>,
+    substituter_repository: Arc<dyn SubstituterRepository>,
     rewrite_nar_url: NarUrlRewriteOption,
     tolerance: u64,
     ignore_query_error: bool,
@@ -25,14 +25,14 @@ pub struct NarInfoService {
 impl NarInfoService {
     pub fn new(
         nar_info_provider: Arc<dyn NarInfoProvider>,
-        substituter_availability_index: Arc<dyn SubstituterAvailabilityIndex>,
+        substituter_repository: Arc<dyn SubstituterRepository>,
         rewrite_nar_url: NarUrlRewriteOption,
         tolerance: u64,
         ignore_query_error: bool,
     ) -> Self {
         Self {
             nar_info_provider,
-            substituter_availability_index,
+            substituter_repository,
             rewrite_nar_url,
             tolerance,
             ignore_query_error,
@@ -82,7 +82,7 @@ impl NarInfoService {
         Result<Option<(UpstreamNarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
         Vec<ResolveNarInfoEvent>,
     ) {
-        let substituters = self.substituter_availability_index.query_all();
+        let substituters = self.substituter_repository.query_all_available().await;
 
         let (res, events) = self
             .query_substituters(hash, substituters, self.tolerance)
@@ -101,7 +101,7 @@ impl NarInfoService {
     ) {
         let mut substituter_graces = HashMap::new();
         for substituter in substituters.iter() {
-            substituter_graces.insert(substituter, substituter.priority().grace(tolerance as i64));
+            substituter_graces.insert(substituter, substituter.grace(tolerance as i64));
         }
 
         let start = Instant::now();
@@ -113,7 +113,7 @@ impl NarInfoService {
             let handle = query_tracker.spawn({
                 let provider = Arc::clone(&self.nar_info_provider);
                 let sub = substituter.clone();
-                let url = hash.on_substituter(substituter.meta());
+                let url = hash.on_substituter(sub.meta());
                 let timeout = sub.meta().nar_info_timeout();
                 async move { (sub, provider.query_nar_info(&url, timeout).await) }
             });

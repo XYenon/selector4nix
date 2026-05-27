@@ -68,18 +68,15 @@ impl SubstituterRepository for InMemorySubstituterRepository {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::substituter::model::{
-        Availability, Priority, SubstituterMeta, Substituter as Sub,
-    };
     use crate::domain::substituter::SubstituterRepository;
+    use crate::domain::substituter::model::{
+        Availability, Priority, Substituter as Sub, SubstituterMeta,
+    };
 
     use super::*;
 
     fn make_sub(url: &str, availability: Availability) -> Sub {
-        let meta = SubstituterMeta::new(
-            Url::new(url).unwrap(),
-            Priority::new(40).unwrap(),
-        );
+        let meta = SubstituterMeta::new(Url::new(url).unwrap(), Priority::new(40).unwrap());
         Sub::new(meta, availability)
     }
 
@@ -108,11 +105,12 @@ mod tests {
         let url = Url::new("https://a.example.com").unwrap();
         repo.save(make_sub("https://a.example.com", Availability::Normal))
             .await;
-        repo.save(
-            make_sub("https://a.example.com", Availability::Offline {
+        repo.save(make_sub(
+            "https://a.example.com",
+            Availability::Offline {
                 detected_at: tokio::time::Instant::now(),
-            }),
-        )
+            },
+        ))
         .await;
 
         let avail = repo.query_all_available().await;
@@ -123,9 +121,10 @@ mod tests {
     #[tokio::test]
     async fn save_available_updates_is_maybe_ready() {
         let repo = InMemorySubstituterRepository::new();
-        repo.save(make_sub("https://a.example.com", Availability::MaybeReady {
-            prev_failures: 0,
-        }))
+        repo.save(make_sub(
+            "https://a.example.com",
+            Availability::MaybeReady { prev_failures: 0 },
+        ))
         .await;
         repo.save(make_sub("https://a.example.com", Availability::Normal))
             .await;
@@ -140,9 +139,10 @@ mod tests {
         let repo = InMemorySubstituterRepository::new();
         repo.save(make_sub("https://a.example.com", Availability::Normal))
             .await;
-        repo.save(make_sub("https://b.example.com", Availability::MaybeReady {
-            prev_failures: 1,
-        }))
+        repo.save(make_sub(
+            "https://b.example.com",
+            Availability::MaybeReady { prev_failures: 1 },
+        ))
         .await;
 
         let avail = repo.query_all_available().await;

@@ -15,12 +15,11 @@ use selector4nix::domain::nar_file::NarFileService;
 use selector4nix::domain::nar_file::model::NarFileKey;
 use selector4nix::domain::nar_info::NarInfoService;
 use selector4nix::domain::nar_info::model::{NarInfo, StorePathHash};
-use selector4nix::domain::substituter::SubstituterService;
-use selector4nix::domain::substituter::index::SubstituterCandidate;
 use selector4nix::domain::substituter::model::{Availability, Substituter, SubstituterMeta};
+use selector4nix::domain::substituter::{SubstituterRepository, SubstituterService};
 use selector4nix::infrastructure::config::{AppConfiguration, AppCredential};
-use selector4nix::infrastructure::index::*;
 use selector4nix::infrastructure::provider::*;
+use selector4nix::infrastructure::repository::*;
 use selector4nix_actor::actor::Address;
 use selector4nix_actor::registry::{
     AsyncFactory, CapacityOption, ExpirationOption, RegistryBuilder,
@@ -140,27 +139,24 @@ pub async fn init_context(
         })
         .collect::<Vec<_>>();
 
-    let (substituter_availability_index_pre, substituter_availability_index_view) =
-        SubstituterAvailabilityIndexActor::new(
-            substituters
-                .iter()
-                .map(SubstituterCandidate::from)
-                .collect(),
-        );
-    let substituter_availability_pub = substituter_availability_index_pre.address().erased();
-    substituter_availability_index_pre.run();
-    let substituter_availability_index = Arc::new(substituter_availability_index_view);
+    let substituter_repository = Arc::new({
+        let substituter_repository = InMemorySubstituterRepository::new();
+        for sub in &substituters {
+            substituter_repository.save(sub.clone()).await;
+        }
+        substituter_repository
+    });
 
     let substituter_service = Arc::new(SubstituterService::new(config.network.periodic_probing));
 
     let nar_file_service = Arc::new(NarFileService::new(
         nar_stream_provider,
-        substituter_availability_index.clone(),
+        substituter_repository.clone(),
     ));
 
     let nar_info_service = Arc::new(NarInfoService::new(
         nar_info_provider,
-        substituter_availability_index.clone(),
+        substituter_repository.clone(),
         config.proxy.rewrite_nar_url,
         config.network.tolerance,
         config.network.ignore_nar_info_error,
@@ -174,14 +170,14 @@ pub async fn init_context(
             }))
             .build();
         for sub in &substituters {
-            let avail_pub = substituter_availability_pub.clone();
             let substituter_service = substituter_service.clone();
             let sub_probing_provider = substituter_probing_provider.clone();
+            let repo = substituter_repository.clone();
             let addr = SubstituterActor::new(
                 Some(sub.clone()),
                 substituter_service,
                 sub_probing_provider,
-                avail_pub,
+                repo,
             )
             .run();
             registry.insert(sub.url().clone(), addr).await;
@@ -219,8 +215,7 @@ pub async fn init_context(
             .build(),
     );
 
-    let substituter_query_usecase =
-        SubstituterQueryUseCase::new(substituter_availability_index.clone());
+    let substituter_query_usecase = SubstituterQueryUseCase::new(substituter_repository.clone());
 
     let nar_file_streaming_usecase = NarFileStreamingUseCase::new(nar_file_registry.clone());
 
