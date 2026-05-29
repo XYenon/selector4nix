@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use snafu::{Snafu, ensure};
 
 use crate::domain::common::url::Url;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NarFileName(String);
 
 impl NarFileName {

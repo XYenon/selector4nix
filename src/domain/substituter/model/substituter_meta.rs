@@ -1,13 +1,12 @@
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::domain::common::url::Url;
 use crate::domain::substituter::model::Priority;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 struct SubstituterMetaInner {
     url: Url,
     storage_url: Url,
@@ -16,7 +15,7 @@ struct SubstituterMetaInner {
     nar_timeout: Option<Duration>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SubstituterMeta(Arc<SubstituterMetaInner>);
 
 impl SubstituterMeta {
@@ -79,28 +78,22 @@ impl SubstituterMeta {
     }
 }
 
-impl PartialEq for SubstituterMeta {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for SubstituterMeta {}
-
-impl Hash for SubstituterMeta {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        self.0.hash(state);
-    }
-}
-
 impl Serialize for SubstituterMeta {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SubstituterMeta {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self(Arc::new(SubstituterMetaInner::deserialize(
+            deserializer,
+        )?)))
     }
 }

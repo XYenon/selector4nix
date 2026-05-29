@@ -14,6 +14,7 @@ fastrand = "2.4.1"
 futures = "0.3.32"
 getset = "0.1.6"
 moka = { version = "0.12.15", features = ["future"] }
+postcard = { version = "1.1.3", default-features = false, features = ["use-std"] }
 redb = "4.1.0"
 reqwest = { version = "0.13.2", features = ["stream"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -49,6 +50,8 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 getset = { workspace = true }
 moka = { workspace = true }
+postcard = { workspace = true }
+redb = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 snafu = { workspace = true }
@@ -60,3 +63,4 @@ tracing-subscriber = { workspace = true }
 url = { workspace = true }
 
 selector4nix-actor = { path = "components/selector4nix-actor" }
+selector4nix-db = { path = "components/selector4nix-db" }

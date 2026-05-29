@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu, ensure};
 use url::{ParseError, Url as UrlInner};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Url(UrlInner);
 
 impl Url {

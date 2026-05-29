@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::domain::common::url::Url;
 use crate::domain::nar_info::model::{ProxyNarInfoData, UpstreamNarInfoData};
 use crate::domain::substituter::model::SubstituterMeta;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NarInfoResolution {
     Resolved {
         nar_info: ProxyNarInfoData,

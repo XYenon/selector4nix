@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 use snafu::{Snafu, ensure};
 
 use crate::domain::common::url::Url;
 use crate::domain::substituter::model::SubstituterMeta;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StorePathHash(String);
 
 impl StorePathHash {

@@ -1,10 +1,11 @@
 use getset::Getters;
+use serde::{Deserialize, Serialize};
 
 use crate::domain::common::url::Url;
 use crate::domain::nar_info::model::{NarFileName, UpstreamNarInfoData};
 use crate::domain::substituter::model::SubstituterMeta;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Getters)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Getters, Serialize, Deserialize)]
 #[getset(get = "pub")]
 pub struct ProxyNarInfoData {
     content: String,

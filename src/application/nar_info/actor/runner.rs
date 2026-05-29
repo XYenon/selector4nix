@@ -5,8 +5,10 @@ use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, Context, Empty
 use tokio::sync::oneshot::Sender as OneshotSender;
 
 use crate::domain::common::expire_at::ExpireAt;
-use crate::domain::nar_info::model::{NarInfo, ProxyNarInfoData};
-use crate::domain::nar_info::{NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent};
+use crate::domain::nar_info::model::{NarInfo, ProxyNarInfoData, StorePathHash};
+use crate::domain::nar_info::{
+    NarInfoRepository, NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent,
+};
 
 #[derive(Debug)]
 pub enum NarInfoRequest {
@@ -29,51 +31,59 @@ impl ResolveNarInfoResponse {
 }
 
 pub struct NarInfoActor {
-    init: Option<NarInfo>,
+    init: Option<StorePathHash>,
     context: Context<NarInfoRequest, EmptyInternal>,
     nar_info_service: Arc<NarInfoService>,
+    nar_info_repository: Arc<dyn NarInfoRepository>,
     nar_info_ttl: Duration,
 }
 
 impl NarInfoActor {
     pub fn new(
-        init: NarInfo,
+        init: StorePathHash,
         nar_info_service: Arc<NarInfoService>,
+        nar_info_repository: Arc<dyn NarInfoRepository>,
         nar_info_ttl: Duration,
     ) -> ActorPre<Self> {
         ActorPreBuilder::inject(|context| Self {
             init: Some(init),
             context,
             nar_info_service,
+            nar_info_repository,
             nar_info_ttl,
         })
     }
 
     async fn handle_request_resolve_nar_info(
         &self,
-        nar: NarInfo,
+        nar_info: NarInfo,
         reply_to: OneshotSender<ResolveNarInfoResponse>,
     ) -> NarInfo {
-        let nar = nar.check_expiry_and_update(SystemTime::now());
+        let nar_info = nar_info.check_expiry_and_update(SystemTime::now());
 
-        if let Some(resolution) = nar.resolution() {
+        if let Some(resolution) = nar_info.resolution() {
             let res = Ok(resolution.nar_info().cloned());
             let _ = reply_to.send(ResolveNarInfoResponse::new(res, Vec::new()));
-            return nar;
+            return nar_info;
         }
 
-        let (res, events) = self.nar_info_service.resolve(nar.hash()).await;
+        let (res, events) = self.nar_info_service.resolve(nar_info.hash()).await;
         match res {
             Ok(resolution) => {
                 let res = Ok(resolution.nar_info().cloned());
                 let expire_at = ExpireAt::since(SystemTime::now(), self.nar_info_ttl);
-                let nar = nar.on_resolved(resolution, expire_at);
+                let nar_info = nar_info.on_resolved(resolution, expire_at);
+
                 let _ = reply_to.send(ResolveNarInfoResponse::new(res, events));
-                nar
+                if let Err(err) = self.nar_info_repository.save(nar_info.clone()).await {
+                    tracing::warn!(hash = %nar_info.hash().value(), %err, "failed to write nar info to persistent cache, ignore");
+                }
+
+                nar_info
             }
             Err(err) => {
                 let _ = reply_to.send(ResolveNarInfoResponse::new(Err(err), events));
-                nar
+                nar_info
             }
         }
     }
@@ -89,7 +99,16 @@ impl Actor for NarInfoActor {
     }
 
     async fn on_start(&mut self) -> Option<Self::State> {
-        self.init.take()
+        let hash = self.init.take()?;
+        let nar_info = match self.nar_info_repository.get(&hash).await {
+            Ok(Some(nar_info)) => nar_info,
+            Ok(None) => NarInfo::new(hash),
+            Err(err) => {
+                tracing::warn!(hash = %hash.value(), %err, "failed to get nar info from persistent cache, ignore and use default");
+                NarInfo::new(hash)
+            }
+        };
+        Some(nar_info)
     }
 
     async fn on_request(

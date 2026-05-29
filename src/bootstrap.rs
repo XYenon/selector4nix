@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result as AnyhowResult};
+use redb::Database;
+use redb::backends::InMemoryBackend;
 use reqwest::Client;
 use selector4nix::api::AppContext;
 use selector4nix::application::nar_file::actor::NarFileActor;
@@ -14,7 +16,7 @@ use selector4nix::application::substituter::usecase::SubstituterQueryUseCase;
 use selector4nix::domain::nar_file::NarFileService;
 use selector4nix::domain::nar_file::model::NarFileKey;
 use selector4nix::domain::nar_info::NarInfoService;
-use selector4nix::domain::nar_info::model::{NarInfo, StorePathHash};
+use selector4nix::domain::nar_info::model::StorePathHash;
 use selector4nix::domain::substituter::model::{Availability, Substituter, SubstituterMeta};
 use selector4nix::domain::substituter::{SubstituterRepository, SubstituterService};
 use selector4nix::infrastructure::config::{AppConfiguration, AppCredential};
@@ -24,6 +26,7 @@ use selector4nix_actor::actor::Address;
 use selector4nix_actor::registry::{
     AsyncFactory, CapacityOption, ExpirationOption, RegistryBuilder,
 };
+use selector4nix_db::cache_kv::CacheKv;
 use tokio::sync::Semaphore;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -96,6 +99,8 @@ pub async fn init_context(
     config: &AppConfiguration,
     credentials: Arc<AppCredential>,
 ) -> AnyhowResult<Arc<AppContext>> {
+    let database = Arc::new(Database::builder().create_with_backend(InMemoryBackend::new())?);
+
     let http_client = Client::builder()
         .user_agent(format!(
             "curl/8.7.1 Nix/2.24.11 {}/{}",
@@ -145,6 +150,11 @@ pub async fn init_context(
             substituter_repository.save(sub.clone()).await;
         }
         substituter_repository
+    });
+
+    let nar_info_repository = Arc::new({
+        let cache_kv = Arc::new(CacheKv::new(database.clone(), "nar_info".into()));
+        CacheKvNarInfoRepository::new(cache_kv)
     });
 
     let substituter_service = Arc::new(SubstituterService::new(config.network.periodic_probing));
@@ -205,11 +215,13 @@ pub async fn init_context(
             .expiration(ExpirationOption::Ttl(config.cache.nar_info_lookup_ttl))
             .factory(AsyncFactory::new({
                 let nar_info_service = nar_info_service.clone();
+                let nar_info_repository = nar_info_repository.clone();
                 let nar_info_ttl = config.cache.nar_info_lookup_ttl;
                 move |hash: &StorePathHash| {
                     let addr = NarInfoActor::new(
-                        NarInfo::new(hash.clone()),
+                        hash.clone(),
                         nar_info_service.clone(),
+                        nar_info_repository.clone(),
                         nar_info_ttl,
                     )
                     .run();

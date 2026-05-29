@@ -1,12 +1,13 @@
 use std::time::SystemTime;
 
 use getset::Getters;
+use serde::{Deserialize, Serialize};
 
 use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::common::url::Url;
 use crate::domain::nar_info::model::{NarInfoResolution, ProxyNarInfoData, StorePathHash};
 
-#[derive(Debug, Clone, PartialEq, Eq, Getters)]
+#[derive(Debug, Clone, PartialEq, Eq, Getters, Serialize, Deserialize)]
 pub struct NarInfo {
     #[getset(get = "pub")]
     hash: StorePathHash,
