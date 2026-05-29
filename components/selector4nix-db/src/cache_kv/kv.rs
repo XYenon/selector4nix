@@ -28,6 +28,12 @@ impl UnixTimestampArg {
     }
 }
 
+impl From<UnixTimestamp> for UnixTimestampArg {
+    fn from(value: UnixTimestamp) -> Self {
+        Self::Pure(value)
+    }
+}
+
 pub struct CacheKv {
     inner: CacheKvInner,
     last_cleanup: AtomicU64,
