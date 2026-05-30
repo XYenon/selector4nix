@@ -77,10 +77,17 @@ in
             config = {
               Label = "cc.starryreverie.selector4nix";
 
-              ProgramArguments = [
-                "${cfg.package}/bin/selector4nix"
-                "--no-log-timestamp"
-              ];
+              ProgramArguments = lib.singleton (
+                "${pkgs.writeShellScript "launch-selector4nix" (
+                  (lib.optionalString cfg.enablePersistentCaching ''
+                    mkdir -p "$HOME/Library/Caches/selector4nix"
+                    export SELECTOR4NIX_CACHE_DIR="$HOME/Library/Caches/selector4nix"
+                  '')
+                  + ''
+                    exec ${cfg.package}/bin/selector4nix --no-log-timestamp
+                  ''
+                )}"
+              );
 
               EnvironmentVariables = {
                 SELECTOR4NIX_CONFIG_FILE = "${configFile}";
