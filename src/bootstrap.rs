@@ -179,6 +179,7 @@ pub async fn init_context(
     let nar_file_service = Arc::new(NarFileService::new(
         nar_stream_provider,
         substituter_repository.clone(),
+        config.cache.nar_location_ttl,
     ));
 
     let nar_info_service = Arc::new(NarInfoService::new(
@@ -218,8 +219,9 @@ pub async fn init_context(
             .expiration(ExpirationOption::Ttl(config.cache.nar_location_ttl))
             .factory(AsyncFactory::new({
                 let svc = nar_file_service.clone();
+                let ttl = config.cache.nar_location_ttl;
                 move |key: &NarFileKey| {
-                    let addr = NarFileActor::new(key.clone(), svc.clone()).run();
+                    let addr = NarFileActor::new(key.clone(), svc.clone(), ttl).run();
                     async move { addr }
                 }
             }))

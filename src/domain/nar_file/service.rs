@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use snafu::Snafu;
 
+use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::nar_file::model::{NarFile, NarFileLocation};
 use crate::domain::nar_file::port::{NarStreamData, NarStreamProvider};
 use crate::domain::nar_info::model::NarFileName;
@@ -10,22 +12,26 @@ use crate::domain::substituter::SubstituterRepository;
 pub struct NarFileService {
     nar_stream_provider: Arc<dyn NarStreamProvider>,
     substituter_repository: Arc<dyn SubstituterRepository>,
+    nar_file_ttl: Duration,
 }
 
 impl NarFileService {
     pub fn new(
         nar_stream_provider: Arc<dyn NarStreamProvider>,
         substituter_repository: Arc<dyn SubstituterRepository>,
+        nar_file_ttl: Duration,
     ) -> Self {
         Self {
             nar_stream_provider,
             substituter_repository,
+            nar_file_ttl,
         }
     }
 
     pub async fn stream(
         &self,
         nar_file: NarFile,
+        now: SystemTime,
     ) -> (NarFile, Result<Option<NarStreamData>, StreamNarFileError>) {
         let nar_file_name = nar_file.key().to_file_name();
 
@@ -45,13 +51,14 @@ impl NarFileService {
         }
 
         let candidates = self.build_candidates_from_all(&nar_file_name).await;
-        self.stream_from_all(nar_file, candidates).await
+        self.stream_from_all(nar_file, candidates, now).await
     }
 
     async fn stream_from_all(
         &self,
         nar_file: NarFile,
         candidates: Vec<NarFileLocation>,
+        now: SystemTime,
     ) -> (NarFile, Result<Option<NarStreamData>, StreamNarFileError>) {
         let outcome = self.nar_stream_provider.stream_nar(&candidates).await;
 
@@ -61,7 +68,14 @@ impl NarFileService {
                     .into_iter()
                     .find(|loc| loc.source_url() == &data.source_url)
                     .expect("returned `source_url` should match a candidate");
-                (nar_file.with_location(location), Ok(Some(data)))
+                let nar_file = match nar_file.location() {
+                    Some(_) => nar_file.on_relocated(location),
+                    None => {
+                        let expire_at = ExpireAt::since(now, self.nar_file_ttl);
+                        nar_file.on_located(location, expire_at)
+                    }
+                };
+                (nar_file, Ok(Some(data)))
             }
             Ok(None) => (nar_file, Ok(None)),
             Err(_) => (nar_file, Err(StreamNarFileError::Infrastructure)),
