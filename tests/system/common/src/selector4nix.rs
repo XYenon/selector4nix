@@ -58,8 +58,7 @@ impl Selector4NixInstanceBuilder {
             "[server]\nip = \"127.0.0.1\"\nport = {port}\n\n[network]\nperiodic_probing = false\n\n{substituter_toml}"
         );
 
-        let mut config_file = NamedTempFile::new()
-            .context("failed to create temp config file")?;
+        let mut config_file = NamedTempFile::new().context("failed to create temp config file")?;
         config_file
             .write_all(config_content.as_bytes())
             .context("failed to write config file")?;
