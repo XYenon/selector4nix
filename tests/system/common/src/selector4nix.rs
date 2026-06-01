@@ -26,6 +26,7 @@ impl Selector4NixInstance {
             bin,
             client,
             substituters: Vec::new(),
+            cache_dir: None,
         }
     }
 
@@ -38,11 +39,17 @@ pub struct Selector4NixInstanceBuilder {
     bin: PathBuf,
     client: Client,
     substituters: Vec<Url>,
+    cache_dir: Option<PathBuf>,
 }
 
 impl Selector4NixInstanceBuilder {
     pub fn substituter(mut self, url: Url) -> Self {
         self.substituters.push(url);
+        self
+    }
+
+    pub fn cache_dir(mut self, path: PathBuf) -> Self {
+        self.cache_dir = Some(path);
         self
     }
 
@@ -66,6 +73,11 @@ impl Selector4NixInstanceBuilder {
 
         let child = Command::new(&self.bin)
             .args(["--config-file", &config_file.path().to_string_lossy()])
+            .args(
+                self.cache_dir
+                    .iter()
+                    .flat_map(|p| ["--cache-dir".to_string(), p.to_string_lossy().into_owned()]),
+            )
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
