@@ -1,10 +1,10 @@
-use std::net::TcpListener;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result as AnyhowResult, bail};
 use reqwest::Client;
+use selector4nix_system_test_common::net::allocate_port;
 use selector4nix_system_test_common::subprocess::SubprocessGuard;
 use tempfile::TempDir;
 
@@ -20,7 +20,7 @@ pub struct SharedContext {
     upstream_port: u16,
     client: Client,
     fixtures: TestFixtures,
-    selector4nix_bin: std::path::PathBuf,
+    selector4nix_bin: PathBuf,
     proxy_counter: u64,
 }
 
@@ -37,7 +37,7 @@ impl SharedContext {
 
         populate_cache(&mut fixtures, &cache_dir, &paths.nix)?;
 
-        let upstream_port = find_free_port();
+        let upstream_port = allocate_port();
         let _nix_serve = start_nix_serve(&paths.nix_serve, &cache_dir, upstream_port)?;
 
         let client = Client::builder()
@@ -59,7 +59,7 @@ impl SharedContext {
     }
 
     pub async fn start_proxy(&mut self) -> AnyhowResult<ProxyInstance> {
-        let proxy_port = find_free_port();
+        let proxy_port = allocate_port();
         let config_name = format!("selector4nix-{}.toml", self.proxy_counter);
         self.proxy_counter += 1;
 
@@ -197,14 +197,6 @@ fn populate_cache(
         fixtures.add_populated(hash.to_string());
     }
     Ok(())
-}
-
-fn find_free_port() -> u16 {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind ephemeral port");
-    listener
-        .local_addr()
-        .expect("failed to get local address")
-        .port()
 }
 
 fn start_nix_serve(
