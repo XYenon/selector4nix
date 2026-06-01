@@ -1652,6 +1652,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "selector4nix-system-test-common"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "fastrand",
+ "reqwest",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "selector4nix-system-test-nar-info-querying"
 version = "0.0.0"
 dependencies = [
@@ -1659,8 +1671,9 @@ dependencies = [
  "clap",
  "fastrand",
  "reqwest",
- "tempfile",
+ "selector4nix-system-test-common",
  "tokio",
+ "url",
  "which",
 ]
 

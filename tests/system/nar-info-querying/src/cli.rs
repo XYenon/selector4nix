@@ -25,16 +25,16 @@ struct Cli {
     repeat: usize,
 }
 
-pub struct ResolvedPaths {
-    pub selector4nix: PathBuf,
-    pub nix: PathBuf,
-    pub nix_serve: PathBuf,
+pub struct TestConfig {
+    pub selector4nix_bin: PathBuf,
+    pub nix_bin: PathBuf,
+    pub nix_serve_bin: PathBuf,
     pub count: usize,
     pub seed: u64,
     pub repeat: usize,
 }
 
-pub fn resolve() -> AnyhowResult<ResolvedPaths> {
+pub fn resolve() -> AnyhowResult<TestConfig> {
     let cli = Cli::parse();
 
     let selector4nix = resolve_binary(cli.selector4nix, "selector4nix")
@@ -43,10 +43,10 @@ pub fn resolve() -> AnyhowResult<ResolvedPaths> {
     let nix_serve = resolve_binary(cli.nix_serve, "nix-serve")
         .context("failed to resolve `nix-serve` binary")?;
 
-    Ok(ResolvedPaths {
-        selector4nix,
-        nix,
-        nix_serve,
+    Ok(TestConfig {
+        selector4nix_bin: selector4nix,
+        nix_bin: nix,
+        nix_serve_bin: nix_serve,
         count: cli.count,
         seed: cli.seed,
         repeat: cli.repeat,
