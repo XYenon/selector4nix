@@ -15,12 +15,38 @@ defaults:
     shell: bash
 
 jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v22
+
+      - name: Discover System Tests
+        id: matrix
+        run: |
+          system="$(nix eval --impure --expr 'builtins.currentSystem' --raw)"
+          tests="$(nix eval ".#packages.${system}.selector4nix.passthru.tests" \
+            --apply builtins.attrNames --json)"
+
+          matrix="$(echo "$tests" | jq -c '[
+            [., ["ubuntu-latest", "macos-latest"]]
+            | combinations
+            | . as [$test, $os]
+            | {test: $test, os: $os}
+          ]')"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: discover
     strategy:
+      fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+        include: ${{ fromJson(needs.discover.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -30,31 +56,23 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v22
 
-      - name: Build and Run passthru.tests
+      - name: Build selector4nix
         run: |
           system="$(nix eval --impure --expr 'builtins.currentSystem' --raw)"
-          tests="$(nix eval ".#packages.${system}.selector4nix.passthru.tests" \
-            --apply builtins.attrNames --json)"
-          echo "system=${system}"
-          echo "tests=${tests}"
-
-          echo "::group::Build selector4nix"
           nix build ".#packages.${system}.selector4nix" -L --no-link --print-out-paths
-          echo "::endgroup::"
 
-          for name in $(echo "$tests" | jq -r '.[]'); do
-            echo "::group::Build passthru.tests.${name}"
-            nix build ".#packages.${system}.selector4nix.passthru.tests.${name}" \
-              -L --no-link --print-out-paths | tee "/tmp/test-${name}-path"
-            echo "::endgroup::"
+      - name: Build passthru.tests.${{ matrix.test }}
+        run: |
+          system="$(nix eval --impure --expr 'builtins.currentSystem' --raw)"
+          nix build ".#packages.${system}.selector4nix.passthru.tests.${{ matrix.test }}" \
+            -L --no-link --print-out-paths | tee /tmp/test-path
 
-            echo "::group::Run passthru.tests.${name}"
-            store_path="$(cat "/tmp/test-${name}-path")"
-            bin="$(ls "$store_path/bin" | head -1)"
-            if [ -z "$bin" ]; then
-              echo "::error::no executable found in ${store_path}/bin"
-              exit 1
-            fi
-            "$store_path/bin/$bin"
-            echo "::endgroup::"
-          done
+      - name: Run passthru.tests.${{ matrix.test }}
+        run: |
+          store_path="$(cat /tmp/test-path)"
+          bin="$(ls "$store_path/bin" | head -1)"
+          if [ -z "$bin" ]; then
+            echo "::error::no executable found in ${store_path}/bin"
+            exit 1
+          fi
+          "$store_path/bin/$bin"
