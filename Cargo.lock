@@ -1670,6 +1670,7 @@ dependencies = [
  "clap",
  "fastrand",
  "reqwest",
+ "selector4nix-system-test-common",
  "tempfile",
  "tokio",
  "which",

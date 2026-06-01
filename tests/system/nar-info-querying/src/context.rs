@@ -1,10 +1,11 @@
 use std::net::TcpListener;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result as AnyhowResult, bail};
 use reqwest::Client;
+use selector4nix_system_test_common::subprocess::SubprocessGuard;
 use tempfile::TempDir;
 
 use crate::cli::ResolvedPaths;
@@ -12,17 +13,6 @@ use crate::fixture::TestFixtures;
 
 const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
-
-struct SubprocessGuard {
-    child: Child,
-}
-
-impl Drop for SubprocessGuard {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
 
 pub struct SharedContext {
     _tempdir: TempDir,
@@ -101,7 +91,7 @@ url = "http://127.0.0.1:{upstream_port}/"
         wait_ready(&self.client, &proxy_base_url).await?;
 
         Ok(ProxyInstance {
-            _guard: SubprocessGuard { child },
+            _guard: SubprocessGuard::new(child),
             proxy_base_url,
         })
     }
@@ -230,5 +220,5 @@ fn start_nix_serve(
         .spawn()
         .context("failed to spawn `nix-serve`")?;
 
-    Ok(SubprocessGuard { child })
+    Ok(SubprocessGuard::new(child))
 }
