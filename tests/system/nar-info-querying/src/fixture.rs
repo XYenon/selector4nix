@@ -31,23 +31,21 @@ fn generate_content(index: usize, total: usize, rng: &mut Rng) -> Vec<u8> {
 
     let size_bucket = index * 4 / total;
     match size_bucket {
-        0 => random_bytes(rng.usize(1..100), rng),
-        1 => random_bytes(rng.usize(100..1_000), rng),
-        2 => random_bytes(rng.usize(1_000..50_000), rng),
-        _ => random_bytes(rng.usize(50_000..500_000), rng),
+        0 => generate_random_bytes(rng.usize(1..100), rng),
+        1 => generate_random_bytes(rng.usize(100..1_000), rng),
+        2 => generate_random_bytes(rng.usize(1_000..50_000), rng),
+        _ => generate_random_bytes(rng.usize(50_000..500_000), rng),
     }
 }
 
-fn random_bytes(len: usize, rng: &mut Rng) -> Vec<u8> {
+fn generate_random_bytes(len: usize, rng: &mut Rng) -> Vec<u8> {
     (0..len).map(|_| rng.u8(..)).collect()
 }
 
-pub fn generate_invalid_hash(rng: &mut Rng) -> String {
-    const NIX_BASE32: &[u8] = b"0123456789abcdfghijklmnpqrsvwxyz";
-    (0..32)
-        .map(|_| {
-            let idx = rng.usize(..NIX_BASE32.len());
-            NIX_BASE32[idx] as char
-        })
+pub fn generate_hash(rng: &mut Rng) -> String {
+    const NIX_BASE32_CHARSET: &[u8] = b"0123456789abcdfghijklmnpqrsvwxyz";
+    rng.choose_multiple(NIX_BASE32_CHARSET.iter(), 32)
+        .iter()
+        .map(|c| **c as char)
         .collect()
 }

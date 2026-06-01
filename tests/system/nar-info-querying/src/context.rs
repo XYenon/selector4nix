@@ -8,19 +8,19 @@ use selector4nix_system_test_common::nix_store::NixStore;
 use selector4nix_system_test_common::selector4nix::Selector4NixInstance;
 use url::Url;
 
-use crate::cli::ResolvedPaths;
+use crate::cli::TestConfig;
 use crate::fixture::TestFixtures;
 
-pub struct SharedContext {
+pub struct TestContext {
     store: NixStore,
     nix_serve: NixServeInstance,
     client: Client,
     selector4nix_bin: PathBuf,
 }
 
-impl SharedContext {
-    pub async fn init(fixtures: &TestFixtures, paths: &ResolvedPaths) -> AnyhowResult<Self> {
-        let mut store = NixStore::create(paths.nix.clone())?;
+impl TestContext {
+    pub async fn init(fixtures: &TestFixtures, config: &TestConfig) -> AnyhowResult<Self> {
+        let mut store = NixStore::create(config.nix_bin.clone())?;
         for (i, content) in fixtures.contents().iter().enumerate() {
             store.add_file(&format!("input-{i}"), content)?;
         }
@@ -31,13 +31,13 @@ impl SharedContext {
             .context("failed to build HTTP client")?;
 
         let nix_serve =
-            NixServeInstance::start(&paths.nix_serve, store.path(), client.clone()).await?;
+            NixServeInstance::start(&config.nix_serve_bin, store.path(), client.clone()).await?;
 
         Ok(Self {
             store,
             nix_serve,
             client,
-            selector4nix_bin: paths.selector4nix.clone(),
+            selector4nix_bin: config.selector4nix_bin.clone(),
         })
     }
 
