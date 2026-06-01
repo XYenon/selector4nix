@@ -7,13 +7,13 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result as AnyhowResult};
 use fastrand::Rng;
+use reqwest::{Client, Response};
 use selector4nix_system_test_common::selector4nix::Selector4NixInstance;
+use url::Url;
 
-use assertions::*;
-use context::TestContext;
-use fixture::generate_test_contents;
-
-use crate::fixture::generate_hash;
+use crate::assertions::*;
+use crate::context::TestContext;
+use crate::fixture::{generate_hash, generate_test_contents};
 
 #[tokio::main]
 async fn main() -> AnyhowResult<()> {
@@ -122,13 +122,13 @@ async fn same_hash_succeeds_idempotently(
 
     for hash in sampled {
         let response1 = fetch_nar_info(context.client(), proxy.base_url(), hash).await?;
-        let body1 = assert_nar_info_ok_get_body(response1, hash).await?;
+        let body1 = assert_nar_info_ok_and_get_body(response1, hash).await?;
 
         let response2 = fetch_nar_info(context.client(), proxy.base_url(), hash).await?;
-        let body2 = assert_nar_info_ok_get_body(response2, hash).await?;
+        let body2 = assert_nar_info_ok_and_get_body(response2, hash).await?;
 
         let response3 = fetch_nar_info(context.client(), proxy.base_url(), hash).await?;
-        let body3 = assert_nar_info_ok_get_body(response3, hash).await?;
+        let body3 = assert_nar_info_ok_and_get_body(response3, hash).await?;
 
         if body1 != body2 || body2 != body3 {
             anyhow::bail!(
@@ -214,4 +214,15 @@ fn sample_hashes<'a>(pool: &[&'a str], n: usize, rng: &mut Rng) -> Vec<&'a str> 
         indices.swap(i, j);
     }
     indices[..n].iter().map(|&i| pool[i]).collect()
+}
+
+pub async fn fetch_nar_info(client: &Client, base_url: &Url, hash: &str) -> AnyhowResult<Response> {
+    let url = base_url
+        .join(&format!("{hash}.narinfo"))
+        .with_context(|| format!("failed to construct URL for `{hash}`"))?;
+    client
+        .get(url)
+        .send()
+        .await
+        .with_context(|| format!("HTTP request failed for `{hash}`"))
 }
