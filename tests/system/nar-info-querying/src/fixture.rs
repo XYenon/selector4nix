@@ -1,24 +1,10 @@
 use fastrand::Rng;
 
-pub struct TestFixtures {
-    contents: Vec<Vec<u8>>,
-}
-
-impl TestFixtures {
-    pub fn new(count: usize, seed: u64) -> Self {
-        let mut rng = Rng::with_seed(seed);
-        let mut contents = Vec::with_capacity(count);
-
-        for i in 0..count {
-            contents.push(generate_content(i, count, &mut rng));
-        }
-
-        Self { contents }
-    }
-
-    pub fn contents(&self) -> &[Vec<u8>] {
-        &self.contents
-    }
+pub fn generate_test_contents(count: usize, seed: u64) -> Vec<Vec<u8>> {
+    let mut rng = Rng::with_seed(seed);
+    (0..count)
+        .map(|i| generate_content(i, count, &mut rng))
+        .collect()
 }
 
 fn generate_content(index: usize, total: usize, rng: &mut Rng) -> Vec<u8> {

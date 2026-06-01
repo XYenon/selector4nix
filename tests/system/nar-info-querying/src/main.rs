@@ -11,7 +11,9 @@ use selector4nix_system_test_common::selector4nix::Selector4NixInstance;
 
 use assertions::*;
 use context::TestContext;
-use fixture::TestFixtures;
+use fixture::generate_test_contents;
+
+use crate::fixture::generate_hash;
 
 #[tokio::main]
 async fn main() -> AnyhowResult<()> {
@@ -20,8 +22,8 @@ async fn main() -> AnyhowResult<()> {
     let seed = config.seed;
     let repeat = config.repeat;
 
-    let fixtures = TestFixtures::new(count, seed);
-    let context = TestContext::init(&fixtures, &config).await?;
+    let contents = generate_test_contents(count, seed);
+    let context = TestContext::init(&contents, &config).await?;
     eprintln!("shared context ready. populated {count} files (seed=`{seed}`, repeat=`{repeat}`)");
 
     let mut seed_index = 0usize;
@@ -99,7 +101,7 @@ async fn nonexistent_hash_returns_404(
 
     let mut generated = 0;
     while generated < 100 {
-        let hash = fixture::generate_hash(rng);
+        let hash = generate_hash(rng);
         if valid_set.contains(hash.as_str()) {
             continue;
         }
@@ -184,9 +186,9 @@ async fn mixed_concurrent_fetches_succeeds(
                 assert_nar_info_ok(response, &hash).await
             }));
         } else {
-            let mut hash = fixture::generate_hash(rng);
+            let mut hash = generate_hash(rng);
             while valid_set.contains(hash.as_str()) {
-                hash = fixture::generate_hash(rng);
+                hash = generate_hash(rng);
             }
             tasks.push(tokio::spawn(async move {
                 let response = fetch_nar_info(&client, &base_url, &hash).await?;

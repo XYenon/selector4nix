@@ -9,7 +9,6 @@ use selector4nix_system_test_common::selector4nix::Selector4NixInstance;
 use url::Url;
 
 use crate::cli::TestConfig;
-use crate::fixture::TestFixtures;
 
 pub struct TestContext {
     store: NixStore,
@@ -19,9 +18,9 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn init(fixtures: &TestFixtures, config: &TestConfig) -> AnyhowResult<Self> {
+    pub async fn init(contents: &[Vec<u8>], config: &TestConfig) -> AnyhowResult<Self> {
         let mut store = NixStore::create(config.nix_bin.clone())?;
-        for (i, content) in fixtures.contents().iter().enumerate() {
+        for (i, content) in contents.iter().enumerate() {
             store.add_file(&format!("input-{i}"), content)?;
         }
 
