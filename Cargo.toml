@@ -30,7 +30,7 @@ which = "8.0.0"
 
 [package]
 name = "selector4nix"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 description = "Nix substituter proxy with parallel cache queries and latency-aware selection"
 license = "GPL-3.0-or-later"
