@@ -49,7 +49,7 @@ async fn run_test(
         repo.save(sub.clone()).await;
     }
 
-    let nar_info_provider = MockNarInfoProvider::new(env.nar_info_entries.into_iter());
+    let nar_info_provider = MockNarInfoProvider::new(env.nar_info_entries);
 
     let nar_resolution_service = NarInfoService::new(
         Arc::new(nar_info_provider),

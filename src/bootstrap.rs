@@ -143,7 +143,11 @@ pub async fn init_context(
         credentials.clone(),
     ));
 
-    let nar_stream_provider = Arc::new(ReqwestNarStreamProvider::new(http_client, concurrency));
+    let nar_stream_provider = Arc::new(ReqwestNarStreamProvider::new(
+        http_client,
+        concurrency,
+        credentials.clone(),
+    ));
 
     let substituters = config
         .substituters

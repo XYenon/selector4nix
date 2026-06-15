@@ -58,7 +58,7 @@ For NixOS, nix-darwin, and Home Manager users, it is recommended to use the modu
 3. `./credentials.toml` in the current directory
 4. `/etc/selector4nix/credentials.toml`
 
-If no credentials file is found, all upstream requests are made without authentication. Credentials are only used for `/nix-cache-info` lookups and `.narinfo` queries; NAR file downloads typically rely on pre-signed URLs.
+If no credentials file is found, all upstream requests are made without authentication. Credentials are used for `/nix-cache-info` lookups, `.narinfo` queries, and NAR file downloads. This is required for private caches such as [Attic](https://github.com/zhaofengli/attic).
 
 An example credentials file is demonstrated below. For a complete reference, see [`docs/credentials.md`](/docs/credentials.md). An annotated example credentials file is also available at [`docs/credentials.example.toml`](/docs/credentials.example.toml).
 

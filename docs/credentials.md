@@ -9,7 +9,7 @@
 
 If no credentials file is found, `selector4nix` continues without credentials. All upstream requests will be unauthenticated.
 
-Credentials are only used for `/nix-cache-info` access and NAR info queries. NAR file downloads do not use credentials because they typically rely on pre-signed URLs.
+Credentials are used for `/nix-cache-info` access, NAR info queries, and NAR file downloads. This is required for private caches such as [Attic](https://github.com/zhaofengli/attic) that authenticate all substituter requests.
 
 ## `credentials`
 

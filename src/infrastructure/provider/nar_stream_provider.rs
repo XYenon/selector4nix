@@ -10,17 +10,24 @@ use tokio::task::JoinSet;
 use crate::domain::common::url::Url;
 use crate::domain::nar_file::model::NarFileLocation;
 use crate::domain::nar_file::port::{NarStreamData, NarStreamHeaders, NarStreamProvider};
+use crate::infrastructure::config::AppCredential;
 
 pub struct ReqwestNarStreamProvider {
     client: Client,
     concurrency: Arc<Semaphore>,
+    credentials: Arc<AppCredential>,
 }
 
 impl ReqwestNarStreamProvider {
-    pub fn new(client: Client, concurrency: Arc<Semaphore>) -> Self {
+    pub fn new(
+        client: Client,
+        concurrency: Arc<Semaphore>,
+        credentials: Arc<AppCredential>,
+    ) -> Self {
         Self {
             client,
             concurrency,
+            credentials,
         }
     }
 
@@ -61,9 +68,14 @@ impl NarStreamProvider for ReqwestNarStreamProvider {
             let client = self.client.clone();
             let location = location.clone();
             let concurrency = self.concurrency.clone();
+            let credentials = self.credentials.clone();
             set.spawn(async move {
                 let _permit = concurrency.acquire().await.unwrap();
-                let request = client.get(location.source_url().value());
+                let mut request = client.get(location.source_url().value());
+                if let Some(credential) = credentials.lookup(location.source_url()) {
+                    request =
+                        request.basic_auth(credential.login.clone(), credential.secret.clone());
+                }
                 let response = if let Some(timeout) = location.timeout() {
                     tokio::time::timeout(timeout, request.send()).await
                 } else {

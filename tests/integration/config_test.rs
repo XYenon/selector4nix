@@ -22,7 +22,7 @@ fn defaults_are_applied_when_sections_omitted() {
     assert_eq!(config.network.nar_timeout, Duration::from_secs(30));
     assert_eq!(config.network.max_concurrent_requests, 12);
     assert_eq!(config.network.tolerance, 50);
-    assert_eq!(config.network.ignore_nar_info_error, false);
+    assert!(!config.network.ignore_nar_info_error);
     assert_eq!(
         config.network.periodic_probing,
         PeriodicProbingOption::Enabled
