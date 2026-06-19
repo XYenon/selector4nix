@@ -13,6 +13,8 @@ rustPlatform.buildRustPackage {
 
   src = import ../../../nix/source.nix { inherit lib; };
 
+  __structuredAttrs = true;
+
   cargoLock = {
     lockFile = ../../../Cargo.lock;
   };
