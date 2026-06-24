@@ -6,7 +6,7 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "selector4nix";
-  version = "0.6.1";
+  version = "0.7.0";
 
   src = import ./source.nix { inherit lib; };
 
