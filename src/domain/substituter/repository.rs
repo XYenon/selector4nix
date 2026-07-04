@@ -49,5 +49,7 @@ pub trait SubstituterRepository: Send + Sync {
 
     async fn query_all_available(&self) -> Arc<Vec<SubstituterCandidate>>;
 
+    async fn exists_available(&self, url: &Url) -> bool;
+
     async fn save(&self, substituter: Substituter);
 }
