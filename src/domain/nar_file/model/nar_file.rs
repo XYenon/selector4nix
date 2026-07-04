@@ -57,14 +57,22 @@ mod tests {
 
     use crate::domain::common::url::Url;
     use crate::domain::nar_info::model::NarFileName;
+    use crate::domain::substituter::model::{Priority, SubstituterMeta};
 
     use super::*;
 
     fn make_nar_file(expire_at: SystemTime) -> NarFile {
         let nar_file_name = NarFileName::new("abc123.nar.xz".into()).unwrap();
         let key = NarFileKey::from_file_name(&nar_file_name);
-        let location =
-            NarFileLocation::new(Url::new("https://example.com/abc123.nar.xz").unwrap(), None);
+
+        let location = NarFileLocation::new(
+            Url::new("https://example.com/abc123.nar.xz").unwrap(),
+            SubstituterMeta::new(
+                Url::new("https://example.com/").unwrap(),
+                Priority::new(40).unwrap(),
+            ),
+            None,
+        );
         NarFile::new(key).on_located(location, ExpireAt::new(expire_at))
     }
 

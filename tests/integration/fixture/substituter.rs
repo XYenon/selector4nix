@@ -4,13 +4,31 @@ use selector4nix::domain::common::url::Url;
 use selector4nix::domain::substituter::model::{
     Availability, Priority, Substituter, SubstituterMeta,
 };
+use tokio::time::Instant;
 
 pub fn make_substituter_meta(url: &Url, priority: u32) -> SubstituterMeta {
     SubstituterMeta::new(url.clone(), Priority::new(priority).unwrap())
 }
 
+pub fn make_substituter_meta_with_storage_url(
+    url: &Url,
+    storage_url: Url,
+    priority: u32,
+) -> SubstituterMeta {
+    make_substituter_meta(url, priority).with_storage_url(storage_url)
+}
+
 pub fn make_substituter_normal(url: &Url, priority: u32) -> Substituter {
     Substituter::new(make_substituter_meta(url, priority), Availability::Normal)
+}
+
+pub fn make_substituter_offline(url: &Url, priority: u32) -> Substituter {
+    Substituter::new(
+        make_substituter_meta(url, priority),
+        Availability::Offline {
+            detected_at: Instant::now(),
+        },
+    )
 }
 
 pub fn make_substituter_normal_with_nar_info_timeout(

@@ -10,6 +10,7 @@ use crate::domain::substituter::model::Priority;
 struct SubstituterMetaInner {
     url: Url,
     storage_url: Url,
+    has_custom_storage_url: bool,
     priority: Priority,
     nar_info_timeout: Option<Duration>,
     nar_timeout: Option<Duration>,
@@ -24,6 +25,7 @@ impl SubstituterMeta {
         Self(Arc::new(SubstituterMetaInner {
             url,
             storage_url,
+            has_custom_storage_url: false,
             priority,
             nar_info_timeout: None,
             nar_timeout: None,
@@ -36,6 +38,10 @@ impl SubstituterMeta {
 
     pub fn storage_url(&self) -> &Url {
         &self.0.storage_url
+    }
+
+    pub fn has_custom_storage_url(&self) -> bool {
+        self.0.has_custom_storage_url
     }
 
     pub fn priority(&self) -> Priority {
@@ -51,8 +57,13 @@ impl SubstituterMeta {
     }
 
     pub fn with_storage_url(&self, storage_url: Url) -> Self {
+        let has_custom_storage_url = match self.0.url.as_dir().join("nar") {
+            Ok(default) => storage_url != default,
+            Err(_) => true,
+        };
         Self(Arc::new(SubstituterMetaInner {
             storage_url,
+            has_custom_storage_url,
             ..(*self.0).clone()
         }))
     }
@@ -95,5 +106,35 @@ impl<'de> Deserialize<'de> for SubstituterMeta {
         Ok(Self(Arc::new(SubstituterMetaInner::deserialize(
             deserializer,
         )?)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_meta(url: &str) -> SubstituterMeta {
+        SubstituterMeta::new(Url::new(url).unwrap(), Priority::new(40).unwrap())
+    }
+
+    #[test]
+    fn default_storage_url_is_not_custom() {
+        let meta = make_meta("https://cache.nixos.org");
+        assert!(!meta.has_custom_storage_url());
+    }
+
+    #[test]
+    fn storage_url_equal_to_default_is_not_custom() {
+        let meta = make_meta("https://example.com");
+        let default_storage = meta.url().as_dir().join("nar").unwrap();
+        let meta = meta.with_storage_url(default_storage);
+        assert!(!meta.has_custom_storage_url());
+    }
+
+    #[test]
+    fn storage_url_differing_from_default_is_custom() {
+        let meta = make_meta("https://example.com");
+        let meta = meta.with_storage_url(Url::new("https://cdn.example.com/nar").unwrap());
+        assert!(meta.has_custom_storage_url());
     }
 }

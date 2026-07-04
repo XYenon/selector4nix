@@ -42,6 +42,12 @@ impl SubstituterRepository for InMemorySubstituterRepository {
         self.available_substituters.load_full()
     }
 
+    async fn exists_available(&self, url: &Url) -> bool {
+        self.substituters
+            .get(url)
+            .is_some_and(|s| !s.is_unavailable())
+    }
+
     async fn save(&self, substituter: Substituter) {
         let _permit = self.write_permit.acquire().await;
 
@@ -76,16 +82,16 @@ impl SubstituterRepository for InMemorySubstituterRepository {
 
 #[cfg(test)]
 mod tests {
+    use tokio::time::Instant;
+
     use crate::domain::substituter::SubstituterRepository;
-    use crate::domain::substituter::model::{
-        Availability, Priority, Substituter as Sub, SubstituterMeta,
-    };
+    use crate::domain::substituter::model::{Availability, Priority, Substituter, SubstituterMeta};
 
     use super::*;
 
-    fn make_sub(url: &str, availability: Availability) -> Sub {
+    fn make_sub(url: &str, availability: Availability) -> Substituter {
         let meta = SubstituterMeta::new(Url::new(url).unwrap(), Priority::new(40).unwrap());
-        Sub::new(meta, availability)
+        Substituter::new(meta, availability)
     }
 
     #[tokio::test]
@@ -96,7 +102,7 @@ mod tests {
         repo.save(make_sub(
             "https://b.example.com",
             Availability::Offline {
-                detected_at: tokio::time::Instant::now(),
+                detected_at: Instant::now(),
             },
         ))
         .await;
@@ -110,6 +116,45 @@ mod tests {
         let repo = InMemorySubstituterRepository::new();
         let result = repo.query_all_available().await;
         assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn exists_available_returns_true() {
+        let repo = InMemorySubstituterRepository::new();
+        repo.save(make_sub("https://a.example.com", Availability::Normal))
+            .await;
+
+        let res = repo
+            .exists_available(&Url::new("https://a.example.com").unwrap())
+            .await;
+        assert!(res);
+    }
+
+    #[tokio::test]
+    async fn exists_available_returns_false_if_unavailable() {
+        let repo = InMemorySubstituterRepository::new();
+        repo.save(make_sub(
+            "https://a.example.com",
+            Availability::Offline {
+                detected_at: Instant::now(),
+            },
+        ))
+        .await;
+
+        let res = repo
+            .exists_available(&Url::new("https://a.example.com").unwrap())
+            .await;
+        assert!(!res);
+    }
+
+    #[tokio::test]
+    async fn exists_available_returns_false_if_does_not_exist() {
+        let repo = InMemorySubstituterRepository::new();
+
+        let res = repo
+            .exists_available(&Url::new("https://a.example.com").unwrap())
+            .await;
+        assert!(!res);
     }
 
     #[tokio::test]
@@ -133,7 +178,7 @@ mod tests {
         repo.save(make_sub(
             "https://a.example.com",
             Availability::Offline {
-                detected_at: tokio::time::Instant::now(),
+                detected_at: Instant::now(),
             },
         ))
         .await;
