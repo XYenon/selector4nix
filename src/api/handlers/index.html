@@ -91,7 +91,6 @@
       font-weight: 600;
       color: var(--text-dim);
       padding: 0.2rem 0.45rem 0.2rem 0.65rem;
-      border-left: 1px solid var(--border);
       font-variant-numeric: tabular-nums;
     }
 
@@ -411,7 +410,7 @@
 
     <nav>
       <a href="https://github.com/StarryReverie/selector4nix">GitHub</a>
-      <a href="https://github.com/StarryReverie/selector4nix/blob/main/docs/configuration.md">Configuration</a>
+      <a href="https://github.com/StarryReverie/selector4nix/blob/master/docs/configuration.md">Configuration</a>
       <a href="/substituters/available">Substituters API</a>
       <a href="/health">Health</a>
     </nav>
@@ -475,27 +474,27 @@
 
     function renderCacheStats(stats, cacheMode) {
       const el = document.getElementById('cache-stats');
-      const storeDetail = cacheMode === 'persistent' ? 'persistent redb' : 'in_memory redb';
+      const storeDetail = cacheMode === 'persistent' ? 'persistent' : 'in-memory';
       const cards = [
         {
-          label: 'NAR Info Lookup',
-          value: stats.nar_info_lookup.entries,
-          detail: `${stats.nar_info_lookup.entries} / ${stats.nar_info_lookup.capacity} · TTL ${stats.nar_info_lookup.ttl_secs}s`,
+          label: 'NAR Info Cache',
+          value: stats.nar_info_cache.entries,
+          detail: `${stats.nar_info_cache.entries} / ${stats.nar_info_cache.capacity}`,
         },
         {
-          label: 'NAR Location',
-          value: stats.nar_location.entries,
-          detail: `${stats.nar_location.entries} / ${stats.nar_location.capacity} · TTL ${stats.nar_location.ttl_secs}s`,
+          label: 'NAR File Cache',
+          value: stats.nar_file_cache.entries,
+          detail: `${stats.nar_file_cache.entries} / ${stats.nar_file_cache.capacity}`,
         },
         {
           label: 'NAR Info Store',
           value: stats.nar_info_store.entries,
-          detail: storeDetail,
+          detail: `${storeDetail} · TTL ${stats.nar_info_store.ttl_secs}s`,
         },
         {
           label: 'NAR File Store',
           value: stats.nar_file_store.entries,
-          detail: storeDetail,
+          detail: `${storeDetail} · TTL ${stats.nar_file_store.ttl_secs}s`,
         },
       ];
 
@@ -529,7 +528,7 @@
     }
 
     function renderConfig(data) {
-      const cacheMode = data.cache_mode === 'persistent' ? 'persistent' : 'in_memory';
+      const cacheMode = data.cache_mode === 'persistent' ? 'persistent' : 'in-memory';
       const proxy = data.proxy;
       const network = data.network;
       const items = [
