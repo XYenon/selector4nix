@@ -15,5 +15,9 @@ pub fn make_nar_file_key() -> NarFileKey {
 }
 
 pub fn make_nar_file_location(substituter_url: &Url, priority: u32) -> NarFileLocation {
-    NarFileLocation::new(make_source_url(substituter_url, priority), None)
+    NarFileLocation::new(
+        make_source_url(substituter_url, priority),
+        substituter::make_substituter_meta(substituter_url, 1),
+        None,
+    )
 }

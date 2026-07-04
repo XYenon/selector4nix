@@ -100,7 +100,7 @@ impl NarFileService {
             .map(|sub| {
                 let source_url = nar_file_name.with_storage_prefix(sub.meta().storage_url());
                 let timeout = sub.meta().nar_timeout();
-                NarFileLocation::new(source_url, timeout)
+                NarFileLocation::new(source_url, sub.meta().clone(), timeout)
             })
             .collect()
     }
