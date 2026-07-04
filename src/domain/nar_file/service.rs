@@ -38,16 +38,27 @@ impl NarFileService {
         let nar_file_name = nar_file.key().to_file_name();
 
         if let Some(location) = nar_file.location() {
-            tracing::trace!(nar_file = %nar_file_name.value(), source_url = %location.source_url(), "use cached nar file location");
+            // Don't send requests to selected substituter that is unavailable and do fallback
+            // early. Always avoid short-circuit if `{url}/nar != storage_url`, because we only
+            // probe the health information of host of `url` and can't determine `storage_url`'s
+            // status.
+            if location.substituter().has_custom_storage_url()
+                || self
+                    .substituter_repository
+                    .exists_available(location.substituter().url())
+                    .await
+            {
+                tracing::trace!(nar_file = %nar_file_name.value(), source_url = %location.source_url(), "use cached nar file location");
 
-            let locations = [location.clone()];
-            let outcome = self
-                .nar_stream_provider
-                .stream_nar(&locations, &headers)
-                .await;
+                let locations = [location.clone()];
+                let outcome = self
+                    .nar_stream_provider
+                    .stream_nar(&locations, &headers)
+                    .await;
 
-            if let Ok(Some(data)) = outcome {
-                return (nar_file, Ok(Some(data)));
+                if let Ok(Some(data)) = outcome {
+                    return (nar_file, Ok(Some(data)));
+                }
             }
 
             tracing::trace!(nar_file = %nar_file_name.value(), "fallback to query all substituters for nar file location");
