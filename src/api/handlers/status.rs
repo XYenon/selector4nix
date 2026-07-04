@@ -61,12 +61,12 @@ struct CacheStatsStatus {
 struct CacheStatus {
     entries: usize,
     capacity: usize,
-    ttl_secs: u64,
 }
 
 #[derive(Serialize)]
 struct StoreStatus {
     entries: usize,
+    ttl_secs: u64,
 }
 
 pub async fn get_status(State(ctx): State<Arc<AppContext>>) -> Json<StatusResponse> {
@@ -114,18 +114,18 @@ fn to_response(snapshot: StatusSnapshot) -> StatusResponse {
             nar_info_cache: CacheStatus {
                 entries: snapshot.nar_info_actor_entries,
                 capacity: config.cache.nar_info_lookup_capacity,
-                ttl_secs: config.cache.nar_info_lookup_ttl.as_secs(),
             },
             nar_file_cache: CacheStatus {
                 entries: snapshot.nar_file_actor_entries,
                 capacity: config.cache.nar_location_capacity,
-                ttl_secs: config.cache.nar_location_ttl.as_secs(),
             },
             nar_info_store: StoreStatus {
                 entries: snapshot.nar_info_persistent_entries,
+                ttl_secs: config.cache.nar_info_lookup_ttl.as_secs(),
             },
             nar_file_store: StoreStatus {
                 entries: snapshot.nar_file_persistent_entries,
+                ttl_secs: config.cache.nar_location_ttl.as_secs(),
             },
         },
     }
