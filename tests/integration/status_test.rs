@@ -149,15 +149,15 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
         false
     );
 
-    assert_eq!(response["cache_stats"]["nar_info_lookup"]["entries"], 0);
-    assert_eq!(response["cache_stats"]["nar_info_lookup"]["capacity"], 4096);
+    assert_eq!(response["cache_stats"]["nar_info_cache"]["entries"], 0);
+    assert_eq!(response["cache_stats"]["nar_info_cache"]["capacity"], 4096);
     assert_eq!(
-        response["cache_stats"]["nar_info_lookup"]["ttl_secs"],
+        response["cache_stats"]["nar_info_cache"]["ttl_secs"],
         14400
     );
-    assert_eq!(response["cache_stats"]["nar_location"]["entries"], 0);
-    assert_eq!(response["cache_stats"]["nar_location"]["capacity"], 4096);
-    assert_eq!(response["cache_stats"]["nar_location"]["ttl_secs"], 14400);
+    assert_eq!(response["cache_stats"]["nar_file_cache"]["entries"], 0);
+    assert_eq!(response["cache_stats"]["nar_file_cache"]["capacity"], 4096);
+    assert_eq!(response["cache_stats"]["nar_file_cache"]["ttl_secs"], 14400);
     assert_eq!(response["cache_stats"]["nar_info_store"]["entries"], 0);
     assert_eq!(response["cache_stats"]["nar_file_store"]["entries"], 0);
 }

@@ -51,21 +51,21 @@ struct SubstituterStatusItem {
 
 #[derive(Serialize)]
 struct CacheStatsStatus {
-    nar_info_lookup: LookupCacheStatus,
-    nar_location: LookupCacheStatus,
-    nar_info_store: StoreCacheStatus,
-    nar_file_store: StoreCacheStatus,
+    nar_info_cache: CacheStatus,
+    nar_file_cache: CacheStatus,
+    nar_info_store: StoreStatus,
+    nar_file_store: StoreStatus,
 }
 
 #[derive(Serialize)]
-struct LookupCacheStatus {
+struct CacheStatus {
     entries: usize,
     capacity: usize,
     ttl_secs: u64,
 }
 
 #[derive(Serialize)]
-struct StoreCacheStatus {
+struct StoreStatus {
     entries: usize,
 }
 
@@ -111,20 +111,20 @@ fn to_response(snapshot: StatusSnapshot) -> StatusResponse {
             items: substituters,
         },
         cache_stats: CacheStatsStatus {
-            nar_info_lookup: LookupCacheStatus {
+            nar_info_cache: CacheStatus {
                 entries: snapshot.nar_info_actor_entries,
                 capacity: config.cache.nar_info_lookup_capacity,
                 ttl_secs: config.cache.nar_info_lookup_ttl.as_secs(),
             },
-            nar_location: LookupCacheStatus {
+            nar_file_cache: CacheStatus {
                 entries: snapshot.nar_file_actor_entries,
                 capacity: config.cache.nar_location_capacity,
                 ttl_secs: config.cache.nar_location_ttl.as_secs(),
             },
-            nar_info_store: StoreCacheStatus {
+            nar_info_store: StoreStatus {
                 entries: snapshot.nar_info_persistent_entries,
             },
-            nar_file_store: StoreCacheStatus {
+            nar_file_store: StoreStatus {
                 entries: snapshot.nar_file_persistent_entries,
             },
         },
