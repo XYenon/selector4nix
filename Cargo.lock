@@ -1631,6 +1631,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "selector4nix-streaming"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "dashmap",
+ "futures",
+ "http",
+ "reqwest",
+ "snafu",
+ "tokio",
+]
+
+[[package]]
 name = "selector4nix-system-test-cache-persistence"
 version = "0.0.0"
 dependencies = [
