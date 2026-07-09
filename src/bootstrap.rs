@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result as AnyhowResult};
 use redb::Database;
 use redb::backends::InMemoryBackend;
-use reqwest::Client;
+use reqwest::{Client, ClientBuilder};
 use selector4nix::api::AppContext;
 use selector4nix::application::nar_file::actor::NarFileActor;
 use selector4nix::application::nar_file::usecase::NarFileStreamingUseCase;
@@ -26,12 +26,12 @@ use selector4nix::domain::substituter::{SubstituterRepository, SubstituterServic
 use selector4nix::infrastructure::config::{AppConfiguration, AppCredential};
 use selector4nix::infrastructure::provider::*;
 use selector4nix::infrastructure::repository::*;
-use selector4nix::infrastructure::util::PerHostHttpThrottler;
 use selector4nix_actor::actor::Address;
 use selector4nix_actor::registry::{
     AsyncFactory, CapacityOption, ExpirationOption, RegistryBuilder,
 };
 use selector4nix_db::cache_kv::CacheKv;
+use selector4nix_streaming::StreamingClient;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer, Registry};
@@ -123,13 +123,12 @@ pub async fn init_context(
         }
     };
 
-    let http_client = Client::builder()
-        .user_agent(SELF_USER_AGENT.as_str())
-        .connect_timeout(config.network.nar_timeout)
+    let http_client = http_client_builder_factory(config)
         .build()
         .context("could not build HTTP client")?;
 
-    let throttler = Arc::new(PerHostHttpThrottler::new(
+    let streaming_http_client = Arc::new(StreamingClient::new(
+        http_client_builder_factory(config),
         config.network.max_concurrent_requests,
     ));
 
@@ -146,8 +145,7 @@ pub async fn init_context(
     ));
 
     let nar_stream_provider = Arc::new(ReqwestNarStreamProvider::new(
-        http_client,
-        throttler,
+        streaming_http_client,
         credentials.clone(),
     ));
 
@@ -304,4 +302,10 @@ pub async fn init_context(
         status_query_usecase,
         config.cache_info.clone(),
     ))
+}
+
+fn http_client_builder_factory(config: &AppConfiguration) -> ClientBuilder {
+    Client::builder()
+        .user_agent(SELF_USER_AGENT.as_str())
+        .connect_timeout(config.network.nar_timeout)
 }

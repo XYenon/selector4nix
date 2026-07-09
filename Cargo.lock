@@ -1601,6 +1601,7 @@ dependencies = [
  "reqwest",
  "selector4nix-actor",
  "selector4nix-db",
+ "selector4nix-streaming",
  "serde",
  "serde_json",
  "snafu",
@@ -1628,6 +1629,20 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "redb",
+]
+
+[[package]]
+name = "selector4nix-streaming"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "dashmap",
+ "futures",
+ "http",
+ "reqwest",
+ "snafu",
+ "tokio",
 ]
 
 [[package]]
