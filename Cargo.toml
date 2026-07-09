@@ -42,6 +42,10 @@ keywords = ["nix", "substituter", "proxy", "cache"]
 categories = ["network-programming", "caching"]
 
 [dependencies]
+selector4nix-actor = { path = "components/selector4nix-actor" }
+selector4nix-db = { path = "components/selector4nix-db" }
+selector4nix-streaming = { path = "components/selector4nix-streaming" }
+
 anyhow = { workspace = true }
 arc-swap = { workspace = true }
 async-trait = { workspace = true }
@@ -64,9 +68,6 @@ tracing = { workspace = true }
 tracing-oslog = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
-
-selector4nix-actor = { path = "components/selector4nix-actor" }
-selector4nix-db = { path = "components/selector4nix-db" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

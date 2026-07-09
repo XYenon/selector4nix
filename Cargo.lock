@@ -1601,6 +1601,7 @@ dependencies = [
  "reqwest",
  "selector4nix-actor",
  "selector4nix-db",
+ "selector4nix-streaming",
  "serde",
  "serde_json",
  "snafu",
