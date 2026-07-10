@@ -44,7 +44,7 @@ impl ReqwestNarStreamProvider {
         };
 
         let stream = response.into_stream();
-        Ok(Some(NarStreamData::new(headers, Box::pin(stream), url)))
+        Ok(Some(NarStreamData::new(headers, stream, url)))
     }
 }
 

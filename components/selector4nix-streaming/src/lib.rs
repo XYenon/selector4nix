@@ -90,14 +90,14 @@ impl StreamingResponse {
         self.inner.headers()
     }
 
-    pub fn into_stream(self) -> impl Stream<Item = Result<Bytes, AnyhowError>> {
-        StreamImpl {
+    pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = Result<Bytes, AnyhowError>> + Send>> {
+        Box::pin(StreamImpl {
             inner: self
                 .inner
                 .bytes_stream()
                 .map(|chunk| chunk.with_context(|| "failed to read nar stream")),
             _permit: self._permit,
-        }
+        })
     }
 }
 
