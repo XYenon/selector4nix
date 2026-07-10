@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::sync::Semaphore;
+
+use crate::throttler::ThrottlerPermit;
 
 pub struct PerHostHttpThrottler {
     max_concurrent_requests: usize,
@@ -48,6 +50,3 @@ impl PerHostHttpThrottler {
         ThrottlerPermit(permit)
     }
 }
-
-#[expect(dead_code)]
-pub struct ThrottlerPermit(OwnedSemaphorePermit);
