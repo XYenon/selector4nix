@@ -12,3 +12,4 @@ http = { workspace = true }
 reqwest = { workspace = true }
 snafu = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }

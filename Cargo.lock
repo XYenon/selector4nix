@@ -1643,6 +1643,7 @@ dependencies = [
  "reqwest",
  "snafu",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
