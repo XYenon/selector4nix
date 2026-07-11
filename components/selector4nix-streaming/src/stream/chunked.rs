@@ -272,3 +272,7 @@ impl Chunk {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "./chunked_tests.rs"]
+mod tests;
