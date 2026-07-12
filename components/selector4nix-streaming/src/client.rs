@@ -19,19 +19,25 @@ use crate::throttler::{PerHostHttpThrottler, ThrottlerAdapter, ThrottlerPermit};
 const CHUNK_MAX_LEN: NonZeroUsize = NonZeroUsize::new(4 * 1024 * 1024).unwrap();
 const WINDOW_MAX_LEN: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 
-pub struct StreamingClient {
+struct StreamingClientContext {
     client: Client,
     throttler: Arc<PerHostHttpThrottler>,
+}
+
+pub struct StreamingClient {
+    context: Arc<StreamingClientContext>,
 }
 
 impl StreamingClient {
     pub fn new(client: ClientBuilder, max_concurrent_requests: usize) -> Self {
         Self {
-            client: client
-                .http1_only()
-                .build()
-                .expect("invalid reqwest client configuration"),
-            throttler: Arc::new(PerHostHttpThrottler::new(max_concurrent_requests)),
+            context: Arc::new(StreamingClientContext {
+                client: client
+                    .http1_only()
+                    .build()
+                    .expect("invalid reqwest client configuration"),
+                throttler: Arc::new(PerHostHttpThrottler::new(max_concurrent_requests)),
+            }),
         }
     }
 
@@ -45,13 +51,12 @@ impl StreamingClient {
             .expect("`url` should have a host")
             .to_string();
 
-        let request = self.client.get(url);
+        let request = self.context.client.get(url);
         StreamingRequest {
             request,
             host,
-            client: self.client.clone(),
+            context: Arc::clone(&self.context),
             configure: None,
-            throttler: Arc::clone(&self.throttler),
         }
     }
 }
@@ -59,9 +64,8 @@ impl StreamingClient {
 pub struct StreamingRequest {
     request: RequestBuilder,
     host: String,
-    client: Client,
     configure: Option<Box<dyn Fn(RequestBuilder) -> RequestBuilder + Send + Sync + 'static>>,
-    throttler: Arc<PerHostHttpThrottler>,
+    context: Arc<StreamingClientContext>,
 }
 
 impl StreamingRequest {
@@ -78,7 +82,7 @@ impl StreamingRequest {
     }
 
     pub async fn send(self) -> Result<StreamingResponse, StreamHttpBodyError> {
-        let permit = self.throttler.acquire(&self.host).await;
+        let permit = self.context.throttler.acquire(&self.host).await;
 
         // The first request always asks for the leading chunk so that servers supporting range
         // requests can be served via a chunked response, while servers that ignore `Range` fall
@@ -90,22 +94,17 @@ impl StreamingRequest {
         );
         let response = request.send().await.context(TransportSnafu)?;
 
-        StreamingResponse::from_response(
-            response,
-            self.client,
-            self.configure,
-            self.throttler,
-            self.host,
-            permit,
-        )
+        StreamingResponse::from_response(response, self.configure, self.host, self.context, permit)
     }
 }
 
-pub enum StreamingResponse {
+pub struct StreamingResponse(StreamingResponseInner);
+
+enum StreamingResponseInner {
     Full {
         response: Response,
         content_length: Option<u64>,
-        _permit: ThrottlerPermit,
+        permit: ThrottlerPermit,
     },
     Chunked {
         response: Response,
@@ -113,30 +112,28 @@ pub enum StreamingResponse {
         initial_chunk_len: usize,
         url: Url,
         host: String,
-        client: Client,
         configure: Option<Box<dyn Fn(RequestBuilder) -> RequestBuilder + Send + Sync + 'static>>,
-        throttler: Arc<PerHostHttpThrottler>,
-        _permit: ThrottlerPermit,
+        context: Arc<StreamingClientContext>,
+        permit: ThrottlerPermit,
     },
 }
 
 impl StreamingResponse {
     fn from_response(
         response: Response,
-        client: Client,
         configure: Option<Box<dyn Fn(RequestBuilder) -> RequestBuilder + Send + Sync + 'static>>,
-        throttler: Arc<PerHostHttpThrottler>,
         host: String,
+        context: Arc<StreamingClientContext>,
         permit: ThrottlerPermit,
     ) -> Result<StreamingResponse, StreamHttpBodyError> {
         match response.status() {
             StatusCode::OK => {
                 tracing::debug!(url = %response.url(), "select full (unchunked) stream");
-                Ok(StreamingResponse::Full {
+                Ok(StreamingResponse(StreamingResponseInner::Full {
                     content_length: response.content_length(),
                     response,
-                    _permit: permit,
-                })
+                    permit,
+                }))
             }
             StatusCode::PARTIAL_CONTENT => {
                 let bytes_total = response
@@ -158,17 +155,16 @@ impl StreamingResponse {
 
                 let url = response.url().clone();
                 tracing::debug!(%url, ?bytes_total, ?initial_chunk_len, "select chunked stream");
-                Ok(StreamingResponse::Chunked {
+                Ok(StreamingResponse(StreamingResponseInner::Chunked {
                     response,
                     bytes_total,
                     initial_chunk_len,
                     url,
                     host,
-                    client,
                     configure,
-                    throttler,
-                    _permit: permit,
-                })
+                    context,
+                    permit,
+                }))
             }
             StatusCode::NOT_FOUND | StatusCode::FORBIDDEN => Err(StreamHttpBodyError::NotFound),
             status => Err(StreamHttpBodyError::InvalidStatus { status }),
@@ -176,46 +172,49 @@ impl StreamingResponse {
     }
 
     pub fn content_length(&self) -> Option<u64> {
-        match self {
-            StreamingResponse::Full { content_length, .. } => *content_length,
-            StreamingResponse::Chunked { bytes_total, .. } => Some(*bytes_total as u64),
+        match &self.0 {
+            StreamingResponseInner::Full { content_length, .. } => *content_length,
+            StreamingResponseInner::Chunked { bytes_total, .. } => Some(*bytes_total as u64),
         }
     }
 
     pub fn raw_headers(&self) -> &HeaderMap {
-        match self {
-            StreamingResponse::Full { response, .. } => response.headers(),
-            StreamingResponse::Chunked { response, .. } => response.headers(),
+        match &self.0 {
+            StreamingResponseInner::Full { response, .. } => response.headers(),
+            StreamingResponseInner::Chunked { response, .. } => response.headers(),
         }
     }
 
     pub fn into_stream(self) -> SBoxStream<AnyhowResult<Bytes>> {
-        match self {
-            StreamingResponse::Full {
-                response, _permit, ..
+        match self.0 {
+            StreamingResponseInner::Full {
+                response, permit, ..
             } => Box::pin(FullStream::new(
                 response.bytes_stream().map(|chunk| {
                     anyhow::Context::with_context(chunk, || "failed to read byte stream")
                 }),
-                _permit,
+                permit,
             )),
-            StreamingResponse::Chunked {
+            StreamingResponseInner::Chunked {
                 response,
                 bytes_total,
                 initial_chunk_len,
-                client,
                 url,
                 configure,
-                throttler,
                 host,
-                _permit,
+                context,
+                permit,
             } => Box::pin(ChunkedStream::new(ChunkedStreamArgs {
                 chunk_max_len: CHUNK_MAX_LEN,
                 bytes_total,
                 window_max_len: WINDOW_MAX_LEN,
-                connector: Box::new(HttpChunkConnector::new(client, url, configure)),
-                throttler: Box::new(ThrottlerAdapter::new(throttler, host)),
-                initial_permit: _permit,
+                connector: Box::new(HttpChunkConnector::new(
+                    context.client.clone(),
+                    url,
+                    configure,
+                )),
+                throttler: Box::new(ThrottlerAdapter::new(Arc::clone(&context.throttler), host)),
+                initial_permit: permit,
                 initial_chunk_stream: Box::pin(BoundedHttpStream::new(
                     Box::pin(response.bytes_stream()),
                     initial_chunk_len,
