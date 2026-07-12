@@ -130,6 +130,9 @@ pub async fn init_context(
     let streaming_http_client = Arc::new(StreamingClient::new(
         http_client_builder_factory(config),
         config.network.max_concurrent_requests,
+        config.network.chunked_streaming,
+        config.network.streaming_chunk_max_len,
+        config.network.streaming_window_max_len,
     ));
 
     let substituter_probing_provider = Arc::new(ReqwestSubstituterProbingProvider::new(

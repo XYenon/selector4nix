@@ -51,6 +51,27 @@ Timeout in seconds for NAR file downloads, also used as connect timeout.
 
 Maximum number of concurrent outgoing NAR file streaming requests, applied per distinct substituter host. The overall ceiling across the proxy is `max_concurrent_requests` multiplied by the number of distinct substituter hosts.
 
+### `network.chunked_streaming`
+
+- Type: Boolean
+- Default: `true`
+
+When enabled, NAR files are downloaded using concurrent multi-connection chunked transfer if the upstream substituter supports Range requests. When multiple NAR files are downloaded concurrently, available connections are shared fairly across files so that no single file monopolizes the bandwidth.
+
+### `network.streaming_chunk_max_len`
+
+- Type: Positive Integer
+- Default: `4194304`
+
+Maximum size in bytes of each chunk when downloading NAR files. The default value is 4 MiB.
+
+### `network.streaming_window_max_len`
+
+- Type: Positive Integer
+- Default: `8`
+
+Maximum number of chunks that may be in flight simultaneously for a single NAR file. The effective concurrency is also bounded by `max_concurrent_requests`. When the per-host concurrency limit is saturated, new chunks defer in favor of streaming other NAR files.
+
 ### `network.tolerance_msecs`
 
 - Type: Natural

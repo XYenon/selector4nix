@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use selector4nix::domain::nar_info::model::NarUrlRewriteOption;
@@ -25,7 +26,16 @@ fn defaults_are_applied_when_sections_omitted() {
     assert!(!config.network.ignore_nar_info_error);
     assert_eq!(
         config.network.periodic_probing,
-        PeriodicProbingOption::Enabled
+        PeriodicProbingOption::Enabled,
+    );
+    assert_eq!(config.network.chunked_streaming, true);
+    assert_eq!(
+        config.network.streaming_chunk_max_len,
+        NonZeroUsize::new(4 * 1024 * 1024).unwrap(),
+    );
+    assert_eq!(
+        config.network.streaming_window_max_len,
+        NonZeroUsize::new(8).unwrap(),
     );
     assert_eq!(config.proxy.rewrite_nar_url, NarUrlRewriteOption::ToSelf);
     assert_eq!(config.cache_info.store_dir, "/nix/store");

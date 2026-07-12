@@ -26,6 +26,9 @@ struct NetworkStatus {
     nar_timeout_secs: u64,
     max_concurrent_requests: usize,
     ignore_nar_info_error: bool,
+    chunked_streaming: bool,
+    streaming_chunk_max_len: usize,
+    streaming_window_max_len: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -103,6 +106,9 @@ fn to_response(snapshot: StatusSnapshot) -> StatusResponse {
             nar_timeout_secs: config.network.nar_timeout.as_secs(),
             max_concurrent_requests: config.network.max_concurrent_requests,
             ignore_nar_info_error: config.network.ignore_nar_info_error,
+            chunked_streaming: config.network.chunked_streaming,
+            streaming_chunk_max_len: usize::from(config.network.streaming_chunk_max_len),
+            streaming_window_max_len: usize::from(config.network.streaming_window_max_len),
         },
         proxy: proxy_status(config.proxy.rewrite_nar_url),
         substituters: SubstitutersStatus {

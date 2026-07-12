@@ -1,4 +1,5 @@
 use std::net::{IpAddr, SocketAddr};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -106,6 +107,9 @@ pub struct NetworkConfiguration {
     pub tolerance: u64,
     pub ignore_nar_info_error: bool,
     pub periodic_probing: PeriodicProbingOption,
+    pub chunked_streaming: bool,
+    pub streaming_chunk_max_len: NonZeroUsize,
+    pub streaming_window_max_len: NonZeroUsize,
 }
 
 impl TryFrom<NetworkRawConfiguration> for NetworkConfiguration {
@@ -127,6 +131,13 @@ impl TryFrom<NetworkRawConfiguration> for NetworkConfiguration {
             } else {
                 PeriodicProbingOption::None
             },
+            chunked_streaming: raw.chunked_streaming.unwrap_or(true),
+            streaming_chunk_max_len: raw
+                .streaming_chunk_max_len
+                .unwrap_or(NonZeroUsize::new(4 * 1024 * 1024).unwrap()),
+            streaming_window_max_len: raw
+                .streaming_window_max_len
+                .unwrap_or(NonZeroUsize::new(8).unwrap()),
         })
     }
 }

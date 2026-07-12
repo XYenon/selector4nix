@@ -540,6 +540,9 @@
         ['NAR Timeout', `${network.nar_timeout_secs}s`],
         ['Max Concurrent', String(network.max_concurrent_requests)],
         ['Ignore NAR Error', network.ignore_nar_info_error ? 'enabled' : 'disabled'],
+        ['Chunked Streaming', network.chunked_streaming ? 'enabled' : 'disabled'],
+        ['Streaming Chunk Size', `${(network.streaming_chunk_max_len / 1048576).toFixed(0)} MiB`],
+        ['Streaming Window Size', String(network.streaming_window_max_len)],
       ];
 
       document.getElementById('config-info').innerHTML = items
