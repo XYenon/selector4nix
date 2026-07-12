@@ -27,8 +27,3 @@ priority = 45
 [[substituters]]
 url = "https://nix-community.cachix.org/"
 priority = 40
-
-[[substituters]]
-url = "https://cache.garnix.io/"
-storage_url = "https://garnix-cache.com/"
-priority = 40
