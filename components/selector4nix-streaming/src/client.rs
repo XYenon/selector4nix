@@ -19,6 +19,7 @@ use crate::throttler::{PerHostHttpThrottler, ThrottlerAdapter, ThrottlerPermit};
 struct StreamingClientContext {
     client: Client,
     throttler: Arc<PerHostHttpThrottler>,
+    enable_chunked_streaming: bool,
     chunk_max_len: NonZeroUsize,
     window_max_len: NonZeroUsize,
 }
@@ -31,6 +32,7 @@ impl StreamingClient {
     pub fn new(
         client: ClientBuilder,
         max_concurrent_requests: usize,
+        enable_chunked_streaming: bool,
         chunk_max_len: NonZeroUsize,
         window_max_len: NonZeroUsize,
     ) -> Self {
@@ -41,6 +43,7 @@ impl StreamingClient {
                     .build()
                     .expect("invalid reqwest client configuration"),
                 throttler: Arc::new(PerHostHttpThrottler::new(max_concurrent_requests)),
+                enable_chunked_streaming,
                 chunk_max_len,
                 window_max_len,
             }),
@@ -90,16 +93,21 @@ impl StreamingRequest {
     pub async fn send(self) -> Result<StreamingResponse, StreamHttpBodyError> {
         let permit = self.context.throttler.acquire(&self.host).await;
 
-        // The first request always asks for the leading chunk so that servers supporting range
-        // requests can be served via a chunked response, while servers that ignore `Range` fall
-        // back to a full stream.
         let request = (self.configure.as_deref().unwrap_or(&|x| x))(self.request);
-        let request = request.header(
-            header::RANGE,
-            format!("bytes=0-{}", usize::from(self.context.chunk_max_len) - 1),
-        );
-        let response = request.send().await.context(TransportSnafu)?;
 
+        let request = if self.context.enable_chunked_streaming {
+            // The first request always asks for the leading chunk so that servers supporting range
+            // requests can be served via a chunked response, while servers that ignore `Range` fall
+            // back to a full stream.
+            request.header(
+                header::RANGE,
+                format!("bytes=0-{}", usize::from(self.context.chunk_max_len) - 1),
+            )
+        } else {
+            request
+        };
+
+        let response = request.send().await.context(TransportSnafu)?;
         StreamingResponse::from_response(response, self.configure, self.host, self.context, permit)
     }
 }
