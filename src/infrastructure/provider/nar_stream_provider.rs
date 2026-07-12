@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
-use http::{Method, StatusCode, header};
-use selector4nix_streaming::{StreamingClient, StreamingResponse};
+use http::header;
+use selector4nix_streaming::{StreamHttpBodyError, StreamingClient, StreamingResponse};
 use tokio::task::JoinSet;
 
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
@@ -32,19 +32,19 @@ impl ReqwestNarStreamProvider {
         let headers = NarStreamHeaders {
             content_length: response.content_length(),
             content_type: response
-                .headers()
+                .raw_headers()
                 .get(header::CONTENT_TYPE)
                 .and_then(|v| v.to_str().ok())
                 .map(ToString::to_string),
             content_encoding: response
-                .headers()
+                .raw_headers()
                 .get(header::CONTENT_ENCODING)
                 .and_then(|v| v.to_str().ok())
                 .map(ToString::to_string),
         };
 
         let stream = response.into_stream();
-        Ok(Some(NarStreamData::new(headers, Box::pin(stream), url)))
+        Ok(Some(NarStreamData::new(headers, stream, url)))
     }
 }
 
@@ -68,9 +68,9 @@ impl NarStreamProvider for ReqwestNarStreamProvider {
             let credentials = Arc::clone(&self.credentials);
 
             set.spawn(async move {
-                let request = client
-                    .request(Method::GET, location.source_url().value())
-                    .configure(|request| {
+                let request = client.get(location.source_url().value()).configure({
+                    let location = location.clone();
+                    move |request| {
                         let mut request = request.headers(headers.to_headers());
 
                         if let Some(credential) = credentials.lookup(location.source_url()) {
@@ -79,7 +79,8 @@ impl NarStreamProvider for ReqwestNarStreamProvider {
                         }
 
                         request
-                    });
+                    }
+                });
 
                 let response = if let Some(timeout) = location.timeout() {
                     tokio::time::timeout(timeout, request.send()).await
@@ -99,17 +100,10 @@ impl NarStreamProvider for ReqwestNarStreamProvider {
             let url = location.source_url();
 
             match response {
-                Ok(Ok(response)) => match response.status() {
-                    StatusCode::OK => {
-                        return Self::wrap_ok_response(url.clone(), response);
-                    }
-                    StatusCode::NOT_FOUND | StatusCode::FORBIDDEN => {
-                        not_found_count += 1;
-                    }
-                    status => {
-                        tracing::debug!(%url, %status, "received unexpected status from substituter");
-                    }
-                },
+                Ok(Ok(response)) => return Self::wrap_ok_response(url.clone(), response),
+                Ok(Err(StreamHttpBodyError::NotFound)) => {
+                    not_found_count += 1;
+                }
                 Ok(Err(e)) => {
                     tracing::debug!(%url, error = %e, "failed to request nar from substituter");
                 }
