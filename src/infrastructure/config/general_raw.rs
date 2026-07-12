@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, num::NonZeroUsize};
 
 use anyhow::{Context, Result as AnyhowResult};
 use serde::Deserialize;
@@ -33,6 +33,8 @@ pub struct NetworkRawConfiguration {
     pub tolerance_msecs: Option<u64>,
     pub ignore_nar_info_error: Option<bool>,
     pub periodic_probing: Option<bool>,
+    pub streaming_chunk_max_len: Option<NonZeroUsize>,
+    pub streaming_window_max_len: Option<NonZeroUsize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Default)]

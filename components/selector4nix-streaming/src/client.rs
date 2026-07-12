@@ -16,12 +16,11 @@ use crate::stream::{
 };
 use crate::throttler::{PerHostHttpThrottler, ThrottlerAdapter, ThrottlerPermit};
 
-const CHUNK_MAX_LEN: NonZeroUsize = NonZeroUsize::new(4 * 1024 * 1024).unwrap();
-const WINDOW_MAX_LEN: NonZeroUsize = NonZeroUsize::new(8).unwrap();
-
 struct StreamingClientContext {
     client: Client,
     throttler: Arc<PerHostHttpThrottler>,
+    chunk_max_len: NonZeroUsize,
+    window_max_len: NonZeroUsize,
 }
 
 pub struct StreamingClient {
@@ -29,7 +28,12 @@ pub struct StreamingClient {
 }
 
 impl StreamingClient {
-    pub fn new(client: ClientBuilder, max_concurrent_requests: usize) -> Self {
+    pub fn new(
+        client: ClientBuilder,
+        max_concurrent_requests: usize,
+        chunk_max_len: NonZeroUsize,
+        window_max_len: NonZeroUsize,
+    ) -> Self {
         Self {
             context: Arc::new(StreamingClientContext {
                 client: client
@@ -37,6 +41,8 @@ impl StreamingClient {
                     .build()
                     .expect("invalid reqwest client configuration"),
                 throttler: Arc::new(PerHostHttpThrottler::new(max_concurrent_requests)),
+                chunk_max_len,
+                window_max_len,
             }),
         }
     }
@@ -90,7 +96,7 @@ impl StreamingRequest {
         let request = (self.configure.as_deref().unwrap_or(&|x| x))(self.request);
         let request = request.header(
             header::RANGE,
-            format!("bytes=0-{}", usize::from(CHUNK_MAX_LEN) - 1),
+            format!("bytes=0-{}", usize::from(self.context.chunk_max_len) - 1),
         );
         let response = request.send().await.context(TransportSnafu)?;
 
@@ -205,9 +211,9 @@ impl StreamingResponse {
                 context,
                 permit,
             } => Box::pin(ChunkedStream::new(ChunkedStreamArgs {
-                chunk_max_len: CHUNK_MAX_LEN,
+                chunk_max_len: context.chunk_max_len,
                 bytes_total,
-                window_max_len: WINDOW_MAX_LEN,
+                window_max_len: context.window_max_len,
                 connector: Box::new(HttpChunkConnector::new(
                     context.client.clone(),
                     url,
