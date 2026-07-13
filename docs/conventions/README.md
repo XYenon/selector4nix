@@ -5,6 +5,7 @@
 This directory documents conventions that govern the project's code, documentation, and development practices. Contributors MUST ensure that their contributions conform to the conventions described here.
 
 - [Git Commits](git-commits.md)
+- [Testing](testing.md)
 
 ## Requirement Level Keywords
 
