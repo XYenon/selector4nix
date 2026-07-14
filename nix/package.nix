@@ -16,6 +16,8 @@ rustPlatform.buildRustPackage (finalAttrs: {
     lockFile = ../Cargo.lock;
   };
 
+  cargoTestFlags = [ "--workspace" ];
+
   passthru.tests = {
     system-test-cache-persistence = callPackage ../tests/system/cache-persistence/package.nix {
       inherit rustPlatform;
