@@ -261,6 +261,10 @@ Build from the current directory:
 nix --extra-experimental-features "nix-command flakes" build .#packages.<system>.selector4nix
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 This project is licensed under [GPL-3.0-or-later](/LICENSE) for the Rust source code (`src/`), [MIT](/LICENSE-NIX) for Nix source code (`flake.nix`, `nix/`), and [CC-BY-SA-4.0](/LICENSE-DOCS) for documentation (`docs/`).

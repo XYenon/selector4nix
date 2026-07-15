@@ -55,6 +55,8 @@ impl NarStreamProvider for ReqwestNarStreamProvider {
         locations: &[NarFileLocation],
         headers: &PassthroughHeaders,
     ) -> AnyhowResult<Option<NarStreamData>> {
+        tracing::debug!(urls = ?locations.iter().map(|l| l.source_url()).collect::<Vec<_>>(), "opening nar file streams from substituters");
+
         if locations.is_empty() {
             return Ok(None);
         }
