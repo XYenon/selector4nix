@@ -6,6 +6,7 @@ This directory documents conventions that govern the project's code, documentati
 
 - [Git Commits](git-commits.md)
 - [Testing](testing.md)
+- [Logging](logging.md)
 
 ## Requirement Level Keywords
 
