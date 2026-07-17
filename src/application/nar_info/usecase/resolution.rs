@@ -7,7 +7,7 @@ use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
 use crate::domain::nar_info::model::{ProxyNarInfoData, StorePathHash};
 use crate::domain::nar_info::{ResolveNarInfoError, ResolveNarInfoEvent};
-use crate::{AppErrorKind, AppOptionExt, AppResult, AppResultExt};
+use crate::{AppError, AppResultExt};
 
 pub struct NarInfoResolutionUseCase {
     nar_info_registry: Arc<NarInfoActorRegistry>,
@@ -32,7 +32,7 @@ impl NarInfoResolutionUseCase {
         &self,
         hash: StorePathHash,
         headers: PassthroughHeaders,
-    ) -> AppResult<ProxyNarInfoData> {
+    ) -> Result<ProxyNarInfoData, AppError> {
         tracing::info!(hash = %hash.value(), "resolving nar info");
 
         let address = self.nar_info_registry.get(&hash).await;
@@ -40,8 +40,7 @@ impl NarInfoResolutionUseCase {
         let response = address
             .ask(|reply_to| NarInfoRequest::ResolveNarInfo { reply_to, headers })
             .await
-            .map_err(|_| anyhow::anyhow!("nar actor terminated unexpectedly"))
-            .wrap(AppErrorKind::Unknown)?;
+            .throw_catastraphic("nar actor terminated unexpectedly")?;
 
         match &response.result {
             Ok(Some(data)) => {
@@ -56,7 +55,8 @@ impl NarInfoResolutionUseCase {
         }
 
         self.exec_events(response.events).await;
-        response.result?.flat()
+        // FIXME
+        Ok(response.result?).throw_not_found("FIXME")
     }
 
     async fn exec_events(&self, events: Vec<ResolveNarInfoEvent>) {

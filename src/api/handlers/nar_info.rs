@@ -4,10 +4,10 @@ use axum::body::Body;
 use axum::extract::{Path, State};
 use http::{HeaderMap, Response, header};
 
+use crate::AppError;
 use crate::api::state::AppContext;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_info::model::StorePathHash;
-use crate::{AppError, AppErrorKind};
 
 pub async fn get_nar_info(
     State(ctx): State<Arc<AppContext>>,
@@ -17,10 +17,7 @@ pub async fn get_nar_info(
     let hash = match filename.strip_suffix(".narinfo") {
         Some(hash) => StorePathHash::new(hash.into())?,
         None => {
-            return Err(AppError::message(
-                AppErrorKind::Input,
-                "missing nar info file",
-            ));
+            return Err(AppError::input("missing nar info file"));
         }
     };
 
