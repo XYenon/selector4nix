@@ -3,11 +3,11 @@ use std::sync::Arc;
 use crate::application::nar_file::actor::{NarFileActorRegistry, NarFileRequest};
 use crate::application::nar_info::actor::{NarInfoActorRegistry, NarInfoRequest};
 use crate::application::substituter::actor::{SubstituterActorRegistry, SubstituterRequest};
-use crate::application::{AppErrorKind, AppOptionExt, AppResult, AppResultExt};
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
 use crate::domain::nar_info::model::{ProxyNarInfoData, StorePathHash};
 use crate::domain::nar_info::{ResolveNarInfoError, ResolveNarInfoEvent};
+use crate::{AppErrorKind, AppOptionExt, AppResult, AppResultExt};
 
 pub struct NarInfoResolutionUseCase {
     nar_info_registry: Arc<NarInfoActorRegistry>,

@@ -5,9 +5,9 @@ use axum::extract::{Path, State};
 use http::{HeaderMap, Response, header};
 
 use crate::api::state::AppContext;
-use crate::application::{AppError, AppErrorKind};
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_info::model::StorePathHash;
+use crate::{AppError, AppErrorKind};
 
 pub async fn get_nar_info(
     State(ctx): State<Arc<AppContext>>,
