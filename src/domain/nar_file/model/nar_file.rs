@@ -5,12 +5,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
+use crate::domain::nar_info::model::StorePathHash;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Getters, Serialize, Deserialize)]
 pub struct NarFile {
     #[getset(get = "pub")]
     key: NarFileKey,
     location: Option<(NarFileLocation, ExpireAt)>,
+    /// Reverse link to the corresponding `NarInfo` identity (store path hash).
+    #[serde(default)]
+    store_path_hash: Option<StorePathHash>,
 }
 
 impl NarFile {
@@ -18,6 +22,7 @@ impl NarFile {
         Self {
             key,
             location: None,
+            store_path_hash: None,
         }
     }
 
@@ -31,12 +36,21 @@ impl NarFile {
         self
     }
 
+    pub fn with_store_path_hash(mut self, store_path_hash: StorePathHash) -> Self {
+        self.store_path_hash = Some(store_path_hash);
+        self
+    }
+
     pub fn location(&self) -> Option<&NarFileLocation> {
         self.location.as_ref().map(|(location, _)| location)
     }
 
     pub fn expire_at(&self) -> Option<ExpireAt> {
         self.location.as_ref().map(|(_, expire_at)| *expire_at)
+    }
+
+    pub fn store_path_hash(&self) -> Option<&StorePathHash> {
+        self.store_path_hash.as_ref()
     }
 
     pub fn check_expiry_and_update(mut self, now: SystemTime) -> Self {
@@ -96,5 +110,12 @@ mod tests {
         let nar_file = nar_file.check_expiry_and_update(now);
 
         assert!(nar_file.location().is_some());
+    }
+
+    #[test]
+    fn with_store_path_hash_sets_reverse_link() {
+        let hash = StorePathHash::new("p4pclmv1gyja5kzc26npqpia1qqxrf0l".into()).unwrap();
+        let nar_file = make_nar_file(SystemTime::now()).with_store_path_hash(hash.clone());
+        assert_eq!(nar_file.store_path_hash(), Some(&hash));
     }
 }

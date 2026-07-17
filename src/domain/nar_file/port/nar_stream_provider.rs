@@ -8,6 +8,8 @@ use futures::Stream;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::common::url::Url;
 use crate::domain::nar_file::model::NarFileLocation;
+use crate::domain::nar_info::model::StorePathHash;
+use crate::domain::substituter::model::SubstituterMeta;
 
 #[async_trait]
 pub trait NarStreamProvider: Send + Sync {
@@ -22,6 +24,9 @@ pub struct NarStreamData {
     pub headers: NarStreamHeaders,
     pub inner: Pin<Box<dyn Stream<Item = AnyhowResult<Bytes>> + Send>>,
     pub source_url: Url,
+    pub substituter: SubstituterMeta,
+    /// Reverse link to `NarInfo` when known from a prior narinfo resolution.
+    pub store_path_hash: Option<StorePathHash>,
 }
 
 impl NarStreamData {
@@ -29,12 +34,20 @@ impl NarStreamData {
         headers: NarStreamHeaders,
         inner: Pin<Box<dyn Stream<Item = AnyhowResult<Bytes>> + Send>>,
         source_url: Url,
+        substituter: SubstituterMeta,
     ) -> Self {
         Self {
             headers,
             inner,
             source_url,
+            substituter,
+            store_path_hash: None,
         }
+    }
+
+    pub fn with_store_path_hash(mut self, store_path_hash: Option<StorePathHash>) -> Self {
+        self.store_path_hash = store_path_hash;
+        self
     }
 }
 

@@ -65,6 +65,7 @@ impl NarInfoService {
                         nar_file: nar_info.nar_file().clone(),
                         substituter: substituter.clone(),
                         source_url: source_url.clone(),
+                        store_path_hash: hash.clone(),
                     });
                 }
 
@@ -216,10 +217,17 @@ pub enum ResolveNarInfoEvent {
     SubstituterSucceeded(Url),
     SubstituterOffline(Url),
     SubstituterError(Url),
+    /// Cold resolve: full location + reverse link to this narinfo's identity.
     NarFileLocated {
         nar_file: NarFileName,
         substituter: SubstituterMeta,
         source_url: Url,
+        store_path_hash: StorePathHash,
+    },
+    /// Cached resolve: re-assert reverse link without re-probing location.
+    NarFileLinked {
+        nar_file: NarFileName,
+        store_path_hash: StorePathHash,
     },
 }
 
