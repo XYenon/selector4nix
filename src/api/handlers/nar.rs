@@ -5,8 +5,8 @@ use axum::extract::{Path, State};
 use futures::StreamExt;
 use http::{HeaderMap, Response, header};
 
+use crate::AppError;
 use crate::api::state::AppContext;
-use crate::application::AppError;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::NarFileKey;
 use crate::domain::nar_file::port::NarStreamData;

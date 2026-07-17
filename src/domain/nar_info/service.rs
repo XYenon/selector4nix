@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use snafu::Snafu;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
+use crate::AppError;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::common::url::Url;
 use crate::domain::nar_info::DeadlineGroup;
@@ -46,7 +46,7 @@ impl NarInfoService {
         hash: &StorePathHash,
         headers: PassthroughHeaders,
     ) -> (
-        Result<NarInfoResolution, ResolveNarInfoError>,
+        Result<NarInfoResolution, AppError>,
         Vec<ResolveNarInfoEvent>,
     ) {
         let (res, mut events) = self.resolve_unknown(hash, headers).await;
@@ -83,7 +83,7 @@ impl NarInfoService {
         hash: &StorePathHash,
         headers: PassthroughHeaders,
     ) -> (
-        Result<Option<(UpstreamNarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
+        Result<Option<(UpstreamNarInfoData, SubstituterMeta)>, AppError>,
         Vec<ResolveNarInfoEvent>,
     ) {
         let substituters = self.substituter_repository.query_all_available().await;
@@ -101,7 +101,7 @@ impl NarInfoService {
         substituters: Arc<Vec<SubstituterCandidate>>,
         tolerance: u64,
     ) -> (
-        Result<Option<(UpstreamNarInfoData, SubstituterMeta)>, ResolveNarInfoError>,
+        Result<Option<(UpstreamNarInfoData, SubstituterMeta)>, AppError>,
         Vec<ResolveNarInfoEvent>,
     ) {
         let headers = Arc::new(headers);
@@ -201,7 +201,12 @@ impl NarInfoService {
                 (Ok(Some((optimal.nar_info, meta))), events)
             }
             None if !has_error => (Ok(None), events),
-            None => (Err(ResolveNarInfoError::Fetch), events),
+            None => (
+                Err(AppError::infrastructure(
+                    "could not get results from all substituters to determine whether the nar info exists",
+                )),
+                events,
+            ),
         }
     }
 }
@@ -216,13 +221,6 @@ pub enum ResolveNarInfoEvent {
         substituter: SubstituterMeta,
         source_url: Url,
     },
-}
-
-#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ResolveNarInfoError {
-    #[snafu(display("could not fetch narinfo"))]
-    Fetch,
 }
 
 struct NarInfoQueryCandidate {

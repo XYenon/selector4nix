@@ -4,8 +4,8 @@ use std::time::{Duration, SystemTime};
 
 use selector4nix::domain::common::passthrough_headers::PassthroughHeaders;
 use selector4nix::domain::common::url::Url;
+use selector4nix::domain::nar_file::NarFileService;
 use selector4nix::domain::nar_file::model::NarFile;
-use selector4nix::domain::nar_file::{NarFileService, StreamNarFileError};
 use selector4nix::domain::substituter::SubstituterRepository;
 use selector4nix::domain::substituter::model::Substituter;
 use selector4nix::infrastructure::repository::InMemorySubstituterRepository;
@@ -26,7 +26,7 @@ struct TestCaseInput {
 
 #[derive(Debug)]
 struct TestCaseExpectation {
-    result_source_url: Result<Option<Url>, StreamNarFileError>,
+    result_source_url: Result<Url, ()>,
     used_substituter_url: Option<Url>,
     not_contacted_source_urls: Vec<Url>,
 }
@@ -53,7 +53,7 @@ async fn run_test(
         .await;
 
     assert_eq!(
-        result.map(|opt| opt.map(|data| data.source_url)),
+        result.map(|data| data.source_url).map_err(|_| ()),
         expectation.result_source_url,
     );
 
@@ -89,7 +89,7 @@ async fn cached_substituter_unavailable_falls_back_early() {
         },
         TestCaseInput { nar_file },
         TestCaseExpectation {
-            result_source_url: Ok(Some(b_src)),
+            result_source_url: Ok(b_src),
             used_substituter_url: Some(b_url),
             not_contacted_source_urls: vec![a_src],
         },
@@ -112,7 +112,7 @@ async fn cached_substituter_available_serves_from_cache() {
         },
         TestCaseInput { nar_file },
         TestCaseExpectation {
-            result_source_url: Ok(Some(a_src)),
+            result_source_url: Ok(a_src),
             used_substituter_url: Some(a_url),
             not_contacted_source_urls: vec![],
         },
@@ -138,7 +138,7 @@ async fn offline_substituter_with_separate_storage_still_served_from_cache() {
         },
         TestCaseInput { nar_file },
         TestCaseExpectation {
-            result_source_url: Ok(Some(a_src)),
+            result_source_url: Ok(a_src),
             used_substituter_url: Some(a_url),
             not_contacted_source_urls: vec![],
         },
@@ -165,7 +165,7 @@ async fn cached_attempt_fails_falls_back() {
         },
         TestCaseInput { nar_file },
         TestCaseExpectation {
-            result_source_url: Ok(Some(b_src)),
+            result_source_url: Ok(b_src),
             used_substituter_url: Some(b_url),
             not_contacted_source_urls: vec![],
         },

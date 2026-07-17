@@ -5,8 +5,8 @@ use axum::extract::{Query, State};
 use http::{Response, header};
 use serde::Deserialize;
 
+use crate::AppError;
 use crate::api::state::AppContext;
-use crate::application::AppError;
 use crate::domain::substituter::model::Priority;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]

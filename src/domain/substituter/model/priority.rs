@@ -3,6 +3,8 @@ use std::num::NonZeroU32;
 use serde::{Deserialize, Serialize};
 use snafu::{OptionExt, Snafu};
 
+use crate::{AppError, AppErrorKind};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Priority(NonZeroU32);
 
@@ -25,6 +27,12 @@ impl Priority {
 pub enum TryNewPriorityError {
     #[snafu(display("priority should be positive"))]
     Zero,
+}
+
+impl From<TryNewPriorityError> for AppError {
+    fn from(error: TryNewPriorityError) -> Self {
+        Self::new(AppErrorKind::Rule, error)
+    }
 }
 
 #[cfg(test)]

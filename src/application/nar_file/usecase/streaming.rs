@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use crate::application::nar_file::actor::{NarFileActorRegistry, NarFileRequest};
-use crate::application::{AppErrorKind, AppOptionExt, AppResult, AppResultExt};
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::NarFileKey;
 use crate::domain::nar_file::port::NarStreamData;
+use crate::{AppError, AppResultExt};
 
 pub struct NarFileStreamingUseCase {
     nar_file_registry: Arc<NarFileActorRegistry>,
@@ -19,7 +19,7 @@ impl NarFileStreamingUseCase {
         &self,
         key: NarFileKey,
         headers: PassthroughHeaders,
-    ) -> AppResult<NarStreamData> {
+    ) -> Result<NarStreamData, AppError> {
         tracing::info!(nar_file = %key.to_file_name().value(), "acquiring nar stream from substituter");
 
         let address = self.nar_file_registry.get(&key).await;
@@ -27,17 +27,10 @@ impl NarFileStreamingUseCase {
         let response = address
             .ask(|reply_to| NarFileRequest::StreamNarFile { reply_to, headers })
             .await
-            .map_err(|_| anyhow::anyhow!("nar file actor terminated unexpectedly"))
-            .wrap(AppErrorKind::Unknown)?;
+            .throw_catastrophic("`NarFileActor` terminated unexpectedly")?;
 
-        if let Ok(Some(data)) = &response {
-            tracing::info!(nar_file = %key.to_file_name().value(), source_url = %data.source_url, "streamed nar from substituter")
-        } else if let Ok(None) = &response {
-            tracing::warn!(nar_file = %key.to_file_name().value(), "failed to find nar file on any substituter")
-        } else {
-            tracing::warn!(nar_file = %key.to_file_name().value(), "failed to stream nar")
-        }
-
-        response?.flat()
+        response
+            .inspect(|data| tracing::info!(nar_file = %key.to_file_name().value(), source_url = %data.source_url, "streamed nar from substituter"))
+            .inspect_err(|err| tracing::warn!(nar_file = %key.to_file_name().value(), %err, "failed to stream nar"))
     }
 }

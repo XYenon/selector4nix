@@ -3,6 +3,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 
 use crate::domain::common::url::Url;
 use crate::domain::nar_info::model::{NarFileName, TryNewNarFileNameError};
+use crate::{AppError, AppErrorKind};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Getters)]
 pub struct UpstreamNarInfoData {
@@ -70,6 +71,12 @@ pub enum TryUpstreamNewNarInfoData {
     NoUrlField,
     #[snafu(display("nar file name is invalid"))]
     InvalidNarFileName { source: TryNewNarFileNameError },
+}
+
+impl From<TryUpstreamNewNarInfoData> for AppError {
+    fn from(error: TryUpstreamNewNarInfoData) -> Self {
+        Self::new(AppErrorKind::Rule, error)
+    }
 }
 
 #[cfg(test)]
