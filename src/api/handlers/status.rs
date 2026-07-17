@@ -16,6 +16,7 @@ pub struct StatusResponse {
     proxy: ProxyStatus,
     substituters: SubstitutersStatus,
     cache_stats: CacheStatsStatus,
+    active_downloads: ActiveDownloadsStatus,
 }
 
 #[derive(Serialize)]
@@ -70,6 +71,25 @@ struct CacheStatus {
 struct StoreStatus {
     entries: usize,
     ttl_secs: u64,
+}
+
+#[derive(Serialize)]
+struct ActiveDownloadsStatus {
+    total: usize,
+    items: Vec<ActiveDownloadItem>,
+}
+
+#[derive(Serialize)]
+struct ActiveDownloadItem {
+    /// Package name from StorePath when known (e.g. `codex-0.144.5`), else same as `file`.
+    name: String,
+    /// NAR file name (e.g. `….nar.xz`).
+    file: String,
+    substituter: String,
+    source_url: String,
+    content_length: Option<u64>,
+    bytes_transferred: u64,
+    started_at_unix_ms: u64,
 }
 
 pub async fn get_status(State(ctx): State<Arc<AppContext>>) -> Json<StatusResponse> {
@@ -133,6 +153,22 @@ fn to_response(snapshot: StatusSnapshot) -> StatusResponse {
                 entries: snapshot.nar_file_persistent_entries,
                 ttl_secs: config.cache.nar_location_ttl.as_secs(),
             },
+        },
+        active_downloads: ActiveDownloadsStatus {
+            total: snapshot.active_downloads.len(),
+            items: snapshot
+                .active_downloads
+                .into_iter()
+                .map(|item| ActiveDownloadItem {
+                    name: item.name,
+                    file: item.file,
+                    substituter: item.substituter,
+                    source_url: item.source_url,
+                    content_length: item.content_length,
+                    bytes_transferred: item.bytes_transferred,
+                    started_at_unix_ms: item.started_at_unix_ms,
+                })
+                .collect(),
         },
     }
 }
