@@ -7,6 +7,7 @@ use redb::Database;
 use redb::backends::InMemoryBackend;
 use reqwest::{Client, ClientBuilder};
 use selector4nix::api::AppContext;
+use selector4nix::application::nar_file::ActiveDownloadRegistry;
 use selector4nix::application::nar_file::actor::NarFileActor;
 use selector4nix::application::nar_file::usecase::NarFileStreamingUseCase;
 use selector4nix::application::nar_info::actor::NarInfoActor;
@@ -249,6 +250,8 @@ pub async fn init_context(
             .build(),
     );
 
+    let active_downloads = Arc::new(ActiveDownloadRegistry::new());
+
     let nar_file_registry = Arc::new(
         RegistryBuilder::new()
             .capacity(CapacityOption::Lru(config.cache.nar_location_capacity))
@@ -273,7 +276,11 @@ pub async fn init_context(
 
     let substituter_query_usecase = SubstituterQueryUseCase::new(substituter_repository.clone());
 
-    let nar_file_streaming_usecase = NarFileStreamingUseCase::new(nar_file_registry.clone());
+    let nar_file_streaming_usecase = NarFileStreamingUseCase::new(
+        nar_file_registry.clone(),
+        nar_info_repository.clone(),
+        active_downloads.clone(),
+    );
 
     let nar_info_resolution_usecase = NarInfoResolutionUseCase::new(
         nar_info_registry.clone(),
@@ -304,6 +311,7 @@ pub async fn init_context(
             nar_file_registry,
             nar_info_repository,
             nar_file_repository,
+            active_downloads,
         )
     };
 

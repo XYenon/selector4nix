@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::application::nar_file::actor::NarFileActorRegistry;
+use crate::application::nar_file::{ActiveDownloadRegistry, ActiveDownloadSnapshot};
 use crate::application::nar_info::actor::NarInfoActorRegistry;
 use crate::domain::common::url::Url;
 use crate::domain::nar_file::NarFileRepository;
@@ -32,6 +33,7 @@ pub struct StatusSnapshot {
     pub nar_file_actor_entries: usize,
     pub nar_info_persistent_entries: usize,
     pub nar_file_persistent_entries: usize,
+    pub active_downloads: Vec<ActiveDownloadSnapshot>,
 }
 
 pub struct StatusQueryUseCase {
@@ -41,6 +43,7 @@ pub struct StatusQueryUseCase {
     nar_file_registry: Arc<NarFileActorRegistry>,
     nar_info_repository: Arc<dyn NarInfoRepository>,
     nar_file_repository: Arc<dyn NarFileRepository>,
+    active_downloads: Arc<ActiveDownloadRegistry>,
 }
 
 impl StatusQueryUseCase {
@@ -51,6 +54,7 @@ impl StatusQueryUseCase {
         nar_file_registry: Arc<NarFileActorRegistry>,
         nar_info_repository: Arc<dyn NarInfoRepository>,
         nar_file_repository: Arc<dyn NarFileRepository>,
+        active_downloads: Arc<ActiveDownloadRegistry>,
     ) -> Self {
         Self {
             substituter_repository,
@@ -59,6 +63,7 @@ impl StatusQueryUseCase {
             nar_file_registry,
             nar_info_repository,
             nar_file_repository,
+            active_downloads,
         }
     }
 
@@ -66,6 +71,7 @@ impl StatusQueryUseCase {
         tracing::info!("querying status snapshot");
 
         let substituters = self.substituter_repository.query_all().await;
+        let active_downloads = self.active_downloads.list();
 
         let snapshot = StatusSnapshot {
             runtime: self.runtime.clone(),
@@ -98,6 +104,7 @@ impl StatusQueryUseCase {
                     tracing::warn!(%err, cache = "nar_file", "failed to get cache entry count");
                     0
                 }),
+            active_downloads,
         };
 
         tracing::info!(
@@ -107,6 +114,7 @@ impl StatusQueryUseCase {
             nar_file_actor_entries = snapshot.nar_file_actor_entries,
             nar_info_persistent_entries = snapshot.nar_info_persistent_entries,
             nar_file_persistent_entries = snapshot.nar_file_persistent_entries,
+            active_downloads = snapshot.active_downloads.len(),
             "queried status snapshot"
         );
 

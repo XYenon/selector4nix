@@ -6,6 +6,7 @@ use redb::Database;
 use redb::backends::InMemoryBackend;
 use selector4nix::api::AppContext;
 use selector4nix::api::handlers::status::get_status;
+use selector4nix::application::nar_file::ActiveDownloadRegistry;
 use selector4nix::application::nar_file::actor::{NarFileActor, NarFileActorRegistry};
 use selector4nix::application::nar_file::usecase::NarFileStreamingUseCase;
 use selector4nix::application::nar_info::actor::{NarInfoActor, NarInfoActorRegistry};
@@ -87,6 +88,7 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
 
     let nar_info_registry = nar_info_registry();
     let nar_file_registry = nar_file_registry();
+    let active_downloads = Arc::new(ActiveDownloadRegistry::new());
     let status_query_usecase = StatusQueryUseCase::new(
         substituter_repository.clone(),
         Arc::new(StatusRuntimeInfo {
@@ -97,8 +99,9 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
         }),
         nar_info_registry.clone(),
         nar_file_registry.clone(),
-        nar_info_repository,
+        nar_info_repository.clone(),
         nar_file_repository,
+        active_downloads.clone(),
     );
 
     let ctx = AppContext::new(
@@ -108,7 +111,7 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
             substituter_registry(),
             nar_file_registry.clone(),
         ),
-        NarFileStreamingUseCase::new(nar_file_registry),
+        NarFileStreamingUseCase::new(nar_file_registry, nar_info_repository, active_downloads),
         status_query_usecase,
         config.cache_info.clone(),
     );
