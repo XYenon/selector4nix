@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu, ensure};
 use url::{ParseError, Url as UrlInner};
 
+use crate::{AppError, AppErrorKind};
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Url(UrlInner);
 
@@ -67,6 +69,12 @@ pub enum TryNewUrlError {
     UnsupportedScheme { scheme: String },
     #[snafu(display("could not build invalid URL"))]
     Invalid { source: ParseError },
+}
+
+impl From<TryNewUrlError> for AppError {
+    fn from(error: TryNewUrlError) -> Self {
+        Self::new(AppErrorKind::Rule, error)
+    }
 }
 
 #[cfg(test)]

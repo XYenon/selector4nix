@@ -3,6 +3,7 @@ use snafu::{Snafu, ensure};
 
 use crate::domain::common::url::Url;
 use crate::domain::substituter::model::SubstituterMeta;
+use crate::{AppError, AppErrorKind};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StorePathHash(String);
@@ -36,6 +37,12 @@ pub enum TryNewStorePathHashError {
     InvalidLength,
     #[snafu(display("store path hash must contain only lowercase letters and digits"))]
     InvalidCharacter,
+}
+
+impl From<TryNewStorePathHashError> for AppError {
+    fn from(error: TryNewStorePathHashError) -> Self {
+        Self::new(AppErrorKind::Rule, error)
+    }
 }
 
 #[cfg(test)]
