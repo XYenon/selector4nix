@@ -1,4 +1,3 @@
-use crate::domain::nar_info::ResolveNarInfoError;
 use crate::domain::nar_info::model::{
     TryNewNarFileNameError, TryNewStorePathHashError, TryUpstreamNewNarInfoData,
 };
@@ -19,13 +18,5 @@ impl From<TryNewNarFileNameError> for AppError {
 impl From<TryUpstreamNewNarInfoData> for AppError {
     fn from(error: TryUpstreamNewNarInfoData) -> Self {
         Self::new(AppErrorKind::Rule, error)
-    }
-}
-
-impl From<ResolveNarInfoError> for AppError {
-    fn from(error: ResolveNarInfoError) -> Self {
-        match &error {
-            ResolveNarInfoError::Fetch => Self::new(AppErrorKind::Infrastructure, error),
-        }
     }
 }

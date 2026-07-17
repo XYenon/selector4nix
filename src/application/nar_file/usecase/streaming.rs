@@ -27,17 +27,10 @@ impl NarFileStreamingUseCase {
         let response = address
             .ask(|reply_to| NarFileRequest::StreamNarFile { reply_to, headers })
             .await
-            .throw_catastraphic("nar actor terminated unexpectedly")?;
+            .throw_catastrophic("`NarFileActor` terminated unexpectedly")?;
 
-        if let Ok(Some(data)) = &response {
-            tracing::info!(nar_file = %key.to_file_name().value(), source_url = %data.source_url, "streamed nar from substituter")
-        } else if let Ok(None) = &response {
-            tracing::warn!(nar_file = %key.to_file_name().value(), "failed to find nar file on any substituter")
-        } else {
-            tracing::warn!(nar_file = %key.to_file_name().value(), "failed to stream nar")
-        }
-
-        // FIXME
-        Ok(response?).throw_not_found("FIXME")
+        response
+            .inspect(|data| tracing::info!(nar_file = %key.to_file_name().value(), source_url = %data.source_url, "streamed nar from substituter"))
+            .inspect_err(|err| tracing::warn!(nar_file = %key.to_file_name().value(), %err, "failed to stream nar"))
     }
 }

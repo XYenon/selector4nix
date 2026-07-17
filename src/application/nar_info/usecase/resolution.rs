@@ -5,8 +5,8 @@ use crate::application::nar_info::actor::{NarInfoActorRegistry, NarInfoRequest};
 use crate::application::substituter::actor::{SubstituterActorRegistry, SubstituterRequest};
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::{NarFileKey, NarFileLocation};
+use crate::domain::nar_info::ResolveNarInfoEvent;
 use crate::domain::nar_info::model::{ProxyNarInfoData, StorePathHash};
-use crate::domain::nar_info::{ResolveNarInfoError, ResolveNarInfoEvent};
 use crate::{AppError, AppResultExt};
 
 pub struct NarInfoResolutionUseCase {
@@ -40,23 +40,26 @@ impl NarInfoResolutionUseCase {
         let response = address
             .ask(|reply_to| NarInfoRequest::ResolveNarInfo { reply_to, headers })
             .await
-            .throw_catastraphic("nar actor terminated unexpectedly")?;
-
-        match &response.result {
-            Ok(Some(data)) => {
-                tracing::info!(hash = %hash.value(), nar_file = %data.nar_file().value(), "resolved nar info");
-            }
-            Ok(None) => {
-                tracing::info!(hash = %hash.value(), "resolved nar info with not-found")
-            }
-            Err(ResolveNarInfoError::Fetch) => {
-                tracing::warn!(hash = %hash.value(), "failed to resolve nar info")
-            }
-        }
+            .throw_catastrophic("`NarInfoActor` terminated unexpectedly")?;
 
         self.exec_events(response.events).await;
-        // FIXME
-        Ok(response.result?).throw_not_found("FIXME")
+
+        match response.result {
+            Ok(Some(data)) => {
+                tracing::info!(hash = %hash.value(), nar_file = %data.nar_file().value(), "resolved nar info");
+                Ok(data)
+            }
+            Ok(None) => {
+                tracing::info!(hash = %hash.value(), "resolved nar info with not-found");
+                Err(AppError::not_found(
+                    "could not resolve non-existent nar info",
+                ))
+            }
+            Err(err) => {
+                tracing::warn!(hash = %hash.value(), %err, "failed to resolve nar info");
+                Err(err)
+            }
+        }
     }
 
     async fn exec_events(&self, events: Vec<ResolveNarInfoEvent>) {

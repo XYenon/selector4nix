@@ -4,15 +4,16 @@ use std::time::{Duration, SystemTime};
 use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, Context, EmptyInternal};
 use tokio::sync::oneshot::Sender as OneshotSender;
 
+use crate::AppError;
 use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::{NarFile, NarFileKey, NarFileLocation};
 use crate::domain::nar_file::port::NarStreamData;
-use crate::domain::nar_file::{NarFileRepository, NarFileService, StreamNarFileError};
+use crate::domain::nar_file::{NarFileRepository, NarFileService};
 
 pub enum NarFileRequest {
     StreamNarFile {
-        reply_to: OneshotSender<Result<Option<NarStreamData>, StreamNarFileError>>,
+        reply_to: OneshotSender<Result<NarStreamData, AppError>>,
         headers: PassthroughHeaders,
     },
     SetLocation(NarFileLocation),

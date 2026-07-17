@@ -1,14 +1,13 @@
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use snafu::Snafu;
-
 use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::{NarFile, NarFileLocation};
 use crate::domain::nar_file::port::{NarStreamData, NarStreamProvider};
 use crate::domain::nar_info::model::NarFileName;
 use crate::domain::substituter::SubstituterRepository;
+use crate::{AppError, AppResultExt};
 
 pub struct NarFileService {
     nar_stream_provider: Arc<dyn NarStreamProvider>,
@@ -34,7 +33,7 @@ impl NarFileService {
         nar_file: NarFile,
         headers: PassthroughHeaders,
         now: SystemTime,
-    ) -> (NarFile, Result<Option<NarStreamData>, StreamNarFileError>) {
+    ) -> (NarFile, Result<NarStreamData, AppError>) {
         let nar_file_name = nar_file.key().to_file_name();
 
         if let Some(location) = nar_file.location() {
@@ -57,7 +56,7 @@ impl NarFileService {
                     .await;
 
                 if let Ok(Some(data)) = outcome {
-                    return (nar_file, Ok(Some(data)));
+                    return (nar_file, Ok(data));
                 }
             }
 
@@ -77,7 +76,7 @@ impl NarFileService {
         headers: PassthroughHeaders,
         candidates: Vec<NarFileLocation>,
         now: SystemTime,
-    ) -> (NarFile, Result<Option<NarStreamData>, StreamNarFileError>) {
+    ) -> (NarFile, Result<NarStreamData, AppError>) {
         let outcome = self
             .nar_stream_provider
             .stream_nar(&candidates, &headers)
@@ -96,10 +95,18 @@ impl NarFileService {
                         nar_file.on_located(location, expire_at)
                     }
                 };
-                (nar_file, Ok(Some(data)))
+                (nar_file, Ok(data))
             }
-            Ok(None) => (nar_file, Ok(None)),
-            Err(_) => (nar_file, Err(StreamNarFileError::Infrastructure)),
+            Ok(None) => (
+                nar_file,
+                Err(AppError::not_found(
+                    "failed to acquire stream for non-existent nar file",
+                )),
+            ),
+            Err(err) => (
+                nar_file,
+                Err(err).chain_infrastructure("failed to acquire nar stream from substituters"),
+            ),
         }
     }
 
@@ -115,11 +122,4 @@ impl NarFileService {
             })
             .collect()
     }
-}
-
-#[derive(Snafu, Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum StreamNarFileError {
-    #[snafu(display("failed to stream nar file"))]
-    Infrastructure,
 }

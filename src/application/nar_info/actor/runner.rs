@@ -4,12 +4,11 @@ use std::time::{Duration, SystemTime};
 use selector4nix_actor::actor::{Actor, ActorPre, ActorPreBuilder, Context, EmptyInternal};
 use tokio::sync::oneshot::Sender as OneshotSender;
 
+use crate::AppError;
 use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_info::model::{NarInfo, ProxyNarInfoData, StorePathHash};
-use crate::domain::nar_info::{
-    NarInfoRepository, NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent,
-};
+use crate::domain::nar_info::{NarInfoRepository, NarInfoService, ResolveNarInfoEvent};
 
 #[derive(Debug)]
 pub enum NarInfoRequest {
@@ -21,13 +20,13 @@ pub enum NarInfoRequest {
 
 #[derive(Debug)]
 pub struct ResolveNarInfoResponse {
-    pub result: Result<Option<ProxyNarInfoData>, ResolveNarInfoError>,
+    pub result: Result<Option<ProxyNarInfoData>, AppError>,
     pub events: Vec<ResolveNarInfoEvent>,
 }
 
 impl ResolveNarInfoResponse {
     pub fn new(
-        result: Result<Option<ProxyNarInfoData>, ResolveNarInfoError>,
+        result: Result<Option<ProxyNarInfoData>, AppError>,
         events: Vec<ResolveNarInfoEvent>,
     ) -> Self {
         Self { result, events }

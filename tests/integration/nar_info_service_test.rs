@@ -6,7 +6,7 @@ use selector4nix::domain::common::passthrough_headers::PassthroughHeaders;
 use selector4nix::domain::common::url::Url;
 use selector4nix::domain::nar_info::model::{NarUrlRewriteOption, StorePathHash};
 use selector4nix::domain::nar_info::port::NarInfoQueryData;
-use selector4nix::domain::nar_info::{NarInfoService, ResolveNarInfoError, ResolveNarInfoEvent};
+use selector4nix::domain::nar_info::{NarInfoService, ResolveNarInfoEvent};
 use selector4nix::domain::substituter::SubstituterRepository;
 use selector4nix::domain::substituter::model::Substituter;
 use selector4nix::infrastructure::repository::InMemorySubstituterRepository;
@@ -29,7 +29,7 @@ struct TestCaseInput {
 
 #[derive(Debug)]
 struct TestCaseExpectation {
-    source_url: Result<Option<Url>, ResolveNarInfoError>,
+    source_url: Result<Option<Url>, ()>,
     events: Vec<ResolveNarInfoEvent>,
 }
 
@@ -65,7 +65,8 @@ async fn run_test(
         .await;
 
     assert_eq!(
-        res.map(|resolution| resolution.source_url().cloned()),
+        res.map(|resolution| resolution.source_url().cloned())
+            .map_err(|_| ()),
         expectation.source_url,
     );
 
@@ -131,7 +132,7 @@ async fn all_substituters_fail() {
         },
         TestCaseInput { hash },
         TestCaseExpectation {
-            source_url: Err(ResolveNarInfoError::Fetch),
+            source_url: Err(()),
             events: vec![
                 ResolveNarInfoEvent::SubstituterError(sub_a_url),
                 ResolveNarInfoEvent::SubstituterError(sub_b_url),
