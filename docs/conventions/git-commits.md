@@ -14,8 +14,6 @@ The following types are RECOMMENDED:
 - `build`: Build system changes (Cargo, Nix, etc.)
 - `chore`: Dependency updates, version bumps, and miscellaneous tasks
 - `ci`: CI/CD automation configuration changes
-- `merge`: Merge commits
-- `revert`: Reverting a previous commit
 
 Scope is RECOMMENDED and is usually specified by crate:
 
