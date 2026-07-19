@@ -190,18 +190,18 @@ pub async fn init_context(
 
     let substituter_service = Arc::new(SubstituterService::new(config.network.periodic_probing));
 
-    let nar_file_service = Arc::new(NarFileService::new(
-        nar_stream_provider,
-        substituter_repository.clone(),
-        config.cache.nar_location_ttl,
-    ));
-
     let nar_info_service = Arc::new(NarInfoService::new(
         nar_info_provider,
         substituter_repository.clone(),
         config.proxy.rewrite_nar_url,
         config.network.tolerance,
         config.network.ignore_nar_info_error,
+    ));
+
+    let nar_file_service = Arc::new(NarFileService::new(
+        nar_stream_provider,
+        substituter_repository.clone(),
+        config.cache.nar_location_ttl,
     ));
 
     let substituter_registry = Arc::new({
@@ -281,29 +281,31 @@ pub async fn init_context(
         nar_file_registry.clone(),
     );
 
-    let status_runtime_info = Arc::new(StatusRuntimeInfo {
-        version: env!("CARGO_PKG_VERSION"),
-        cache_mode: if has_persistent_cache {
-            CacheMode::Persistent
-        } else {
-            CacheMode::InMemory
-        },
-        config: Arc::new(config.clone()),
-        authenticated_substituter_urls: substituters
-            .iter()
-            .filter(|sub| credentials.lookup(sub.url()).is_some())
-            .map(|sub| sub.url().clone())
-            .collect(),
-    });
+    let status_query_usecase = {
+        let status_runtime_info = Arc::new(StatusRuntimeInfo {
+            version: env!("CARGO_PKG_VERSION"),
+            cache_mode: if has_persistent_cache {
+                CacheMode::Persistent
+            } else {
+                CacheMode::InMemory
+            },
+            config: Arc::new(config.clone()),
+            authenticated_substituter_urls: substituters
+                .iter()
+                .filter(|sub| credentials.lookup(sub.url()).is_some())
+                .map(|sub| sub.url().clone())
+                .collect(),
+        });
 
-    let status_query_usecase = StatusQueryUseCase::new(
-        substituter_repository,
-        status_runtime_info,
-        nar_info_registry,
-        nar_file_registry,
-        nar_info_repository,
-        nar_file_repository,
-    );
+        StatusQueryUseCase::new(
+            substituter_repository,
+            status_runtime_info,
+            nar_info_registry,
+            nar_file_registry,
+            nar_info_repository,
+            nar_file_repository,
+        )
+    };
 
     Ok(AppContext::new(
         substituter_query_usecase,
