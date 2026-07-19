@@ -104,7 +104,8 @@ pub async fn init_context(
     credentials: Arc<AppCredential>,
     cache_dir: Option<PathBuf>,
 ) -> AnyhowResult<Arc<AppContext>> {
-    let persistent_cache = cache_dir.is_some();
+    let has_persistent_cache = cache_dir.is_some();
+
     let database = match cache_dir {
         Some(cache_dir) => {
             if !cache_dir.is_dir() {
@@ -175,11 +176,17 @@ pub async fn init_context(
         substituter_repository
     });
 
-    let nar_info_cache_kv = Arc::new(CacheKv::new(database.clone(), "nar_info".into()));
-    let nar_file_cache_kv = Arc::new(CacheKv::new(database.clone(), "nar_file".into()));
+    let nar_info_repository = {
+        let cache_kv = Arc::new(CacheKv::new(database.clone(), "nar_info".into()));
+        cache_kv.spawn_cleanup_task();
+        Arc::new(CacheKvNarInfoRepository::new(cache_kv))
+    };
 
-    let nar_info_repository = Arc::new(CacheKvNarInfoRepository::new(nar_info_cache_kv.clone()));
-    let nar_file_repository = Arc::new(CacheKvNarFileRepository::new(nar_file_cache_kv.clone()));
+    let nar_file_repository = {
+        let cache_kv = Arc::new(CacheKv::new(database, "nar_file".into()));
+        cache_kv.spawn_cleanup_task();
+        Arc::new(CacheKvNarFileRepository::new(cache_kv))
+    };
 
     let substituter_service = Arc::new(SubstituterService::new(config.network.periodic_probing));
 
@@ -276,7 +283,7 @@ pub async fn init_context(
 
     let status_runtime_info = Arc::new(StatusRuntimeInfo {
         version: env!("CARGO_PKG_VERSION"),
-        cache_mode: if persistent_cache {
+        cache_mode: if has_persistent_cache {
             CacheMode::Persistent
         } else {
             CacheMode::InMemory

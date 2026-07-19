@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result as AnyhowResult};
 use redb::Database;
@@ -45,6 +45,19 @@ impl CacheKv {
             inner: CacheKvInner::new(db, entity_name),
             last_cleanup: 0.into(),
         }
+    }
+
+    pub fn spawn_cleanup_task(self: &Arc<Self>) {
+        let this = Arc::clone(self);
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(2 * CLEANUP_PERIOD)).await;
+                let this = Arc::clone(&this);
+                tokio::task::spawn_blocking(move || {
+                    let _ = this.cleanup(UnixTimestampArg::SystemNow);
+                });
+            }
+        });
     }
 
     pub fn get(
