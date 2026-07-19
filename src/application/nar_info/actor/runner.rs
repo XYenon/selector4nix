@@ -7,7 +7,7 @@ use tokio::sync::oneshot::Sender as OneshotSender;
 use crate::AppError;
 use crate::domain::common::expire_at::ExpireAt;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
-use crate::domain::nar_info::model::{NarInfo, NarInfoResolution, ProxyNarInfoData, StorePathHash};
+use crate::domain::nar_info::model::{NarInfo, ProxyNarInfoData, StorePathHash};
 use crate::domain::nar_info::{NarInfoRepository, NarInfoService, ResolveNarInfoEvent};
 
 #[derive(Debug)]
@@ -67,17 +67,7 @@ impl NarInfoActor {
 
         if let Some(resolution) = nar_info.resolution() {
             let res = Ok(resolution.nar_info().cloned());
-            // Cached hits re-assert the reverse link so NAR downloads can look up labels.
-            let events = match resolution {
-                NarInfoResolution::Resolved { nar_info: data, .. } => {
-                    vec![ResolveNarInfoEvent::NarFileLinked {
-                        nar_file: data.nar_file().clone(),
-                        store_path_hash: nar_info.hash().clone(),
-                    }]
-                }
-                NarInfoResolution::NotFound => Vec::new(),
-            };
-            let _ = reply_to.send(ResolveNarInfoResponse::new(res, events));
+            let _ = reply_to.send(ResolveNarInfoResponse::new(res, Vec::new()));
             return nar_info;
         }
 

@@ -459,8 +459,8 @@
     </section>
 
     <section>
-      <h2>Active Downloads <span id="download-summary"></span></h2>
-      <ul id="download-list" class="substituter-list">
+      <h2>Active Transfers <span id="transfer-summary"></span></h2>
+      <ul id="transfer-list" class="substituter-list">
         <li class="empty">Loading…</li>
       </ul>
     </section>
@@ -563,17 +563,17 @@
       return `${hours}h ${mins % 60}m`;
     }
 
-    function renderActiveDownloads(downloads) {
-      const total = downloads && typeof downloads.total === 'number'
-        ? downloads.total
-        : (downloads && downloads.items ? downloads.items.length : 0);
-      document.getElementById('download-summary').textContent =
+    function renderActiveTransfers(transfers) {
+      const total = transfers && typeof transfers.total === 'number'
+        ? transfers.total
+        : (transfers && transfers.items ? transfers.items.length : 0);
+      document.getElementById('transfer-summary').textContent =
         total > 0 ? `(${total})` : '';
 
-      const list = document.getElementById('download-list');
-      const items = (downloads && downloads.items) || [];
+      const list = document.getElementById('transfer-list');
+      const items = (transfers && transfers.items) || [];
       if (items.length === 0) {
-        list.innerHTML = '<li class="empty">No active downloads</li>';
+        list.innerHTML = '<li class="empty">No active transfers</li>';
         return;
       }
 
@@ -589,8 +589,15 @@
         const progressBar = hasTotal
           ? `<div class="download-progress" title="${progressLabel}"><span style="width:${pct}%"></span></div>`
           : '';
-        const displayName = item.name || item.file;
-        const fileTitle = item.file || displayName;
+        const storePath = item.store_path || '';
+        const packageName = (() => {
+          if (!storePath) return '';
+          const base = storePath.split('/').pop() || '';
+          const dash = base.indexOf('-');
+          return dash >= 0 ? base.slice(dash + 1) : '';
+        })();
+        const displayName = packageName || item.nar_file || '';
+        const fileTitle = item.nar_file || displayName;
         return `
           <li class="substituter-item download-item">
             <div class="download-item-body">
@@ -720,7 +727,7 @@
 
         if (!statusRes.ok) {
           setSectionError('substituter-list', `Status unavailable (${statusRes.status})`);
-          setSectionError('download-list', 'Unavailable');
+          setSectionError('transfer-list', 'Unavailable');
           setSectionError('cache-stats', 'Unavailable');
           setSectionError('config-info', 'Unavailable');
           console.error('failed to load /status', statusRes.status);
@@ -730,7 +737,7 @@
         const data = await statusRes.json();
         renderRuntime(data);
         renderSubstituters(data.substituters);
-        renderActiveDownloads(data.active_downloads || { total: 0, items: [] });
+        renderActiveTransfers(data.active_transfers || { total: 0, items: [] });
         renderCacheStats(data.cache_stats, data.cache_mode);
         if (cacheInfoRes.ok) {
           renderCacheInfo(parseNixCacheInfo(await cacheInfoRes.text()));

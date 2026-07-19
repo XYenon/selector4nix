@@ -16,7 +16,7 @@ pub struct StatusResponse {
     proxy: ProxyStatus,
     substituters: SubstitutersStatus,
     cache_stats: CacheStatsStatus,
-    active_downloads: ActiveDownloadsStatus,
+    active_transfers: ActiveTransfersStatus,
 }
 
 #[derive(Serialize)]
@@ -74,17 +74,15 @@ struct StoreStatus {
 }
 
 #[derive(Serialize)]
-struct ActiveDownloadsStatus {
+struct ActiveTransfersStatus {
     total: usize,
-    items: Vec<ActiveDownloadItem>,
+    items: Vec<ActiveTransferItem>,
 }
 
 #[derive(Serialize)]
-struct ActiveDownloadItem {
-    /// Package name from StorePath when known (e.g. `codex-0.144.5`), else same as `file`.
-    name: String,
-    /// NAR file name (e.g. `….nar.xz`).
-    file: String,
+struct ActiveTransferItem {
+    store_path: Option<String>,
+    nar_file: String,
     substituter: String,
     source_url: String,
     content_length: Option<u64>,
@@ -154,14 +152,14 @@ fn to_response(snapshot: StatusSnapshot) -> StatusResponse {
                 ttl_secs: config.cache.nar_location_ttl.as_secs(),
             },
         },
-        active_downloads: ActiveDownloadsStatus {
-            total: snapshot.active_downloads.len(),
+        active_transfers: ActiveTransfersStatus {
+            total: snapshot.active_transfers.len(),
             items: snapshot
-                .active_downloads
+                .active_transfers
                 .into_iter()
-                .map(|item| ActiveDownloadItem {
-                    name: item.name,
-                    file: item.file,
+                .map(|item| ActiveTransferItem {
+                    store_path: item.store_path,
+                    nar_file: item.nar_file,
                     substituter: item.substituter,
                     source_url: item.source_url,
                     content_length: item.content_length,

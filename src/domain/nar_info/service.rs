@@ -224,11 +224,6 @@ pub enum ResolveNarInfoEvent {
         source_url: Url,
         store_path_hash: StorePathHash,
     },
-    /// Cached resolve: re-assert reverse link without re-probing location.
-    NarFileLinked {
-        nar_file: NarFileName,
-        store_path_hash: StorePathHash,
-    },
 }
 
 struct NarInfoQueryCandidate {

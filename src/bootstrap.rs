@@ -7,7 +7,6 @@ use redb::Database;
 use redb::backends::InMemoryBackend;
 use reqwest::{Client, ClientBuilder};
 use selector4nix::api::AppContext;
-use selector4nix::application::nar_file::ActiveDownloadRegistry;
 use selector4nix::application::nar_file::actor::NarFileActor;
 use selector4nix::application::nar_file::usecase::NarFileStreamingUseCase;
 use selector4nix::application::nar_info::actor::NarInfoActor;
@@ -25,6 +24,7 @@ use selector4nix::domain::nar_info::model::StorePathHash;
 use selector4nix::domain::substituter::model::{Availability, Substituter, SubstituterMeta};
 use selector4nix::domain::substituter::{SubstituterRepository, SubstituterService};
 use selector4nix::infrastructure::config::{AppConfiguration, AppCredential};
+use selector4nix::infrastructure::metric::MetricStore;
 use selector4nix::infrastructure::provider::*;
 use selector4nix::infrastructure::repository::*;
 use selector4nix_actor::actor::Address;
@@ -250,7 +250,7 @@ pub async fn init_context(
             .build(),
     );
 
-    let active_downloads = Arc::new(ActiveDownloadRegistry::new());
+    let metrics = Arc::new(MetricStore::new());
 
     let nar_file_registry = Arc::new(
         RegistryBuilder::new()
@@ -279,7 +279,7 @@ pub async fn init_context(
     let nar_file_streaming_usecase = NarFileStreamingUseCase::new(
         nar_file_registry.clone(),
         nar_info_repository.clone(),
-        active_downloads.clone(),
+        metrics.nar_transfer.clone(),
     );
 
     let nar_info_resolution_usecase = NarInfoResolutionUseCase::new(
@@ -311,7 +311,7 @@ pub async fn init_context(
             nar_file_registry,
             nar_info_repository,
             nar_file_repository,
-            active_downloads,
+            metrics.nar_transfer.clone(),
         )
     };
 

@@ -12,16 +12,20 @@ use crate::domain::nar_file::port::NarStreamData;
 use crate::domain::nar_file::{NarFileRepository, NarFileService};
 use crate::domain::nar_info::model::StorePathHash;
 
+pub struct StreamNarFileResult {
+    pub stream: NarStreamData,
+    pub store_path_hash: Option<StorePathHash>,
+}
+
 pub enum NarFileRequest {
     StreamNarFile {
-        reply_to: OneshotSender<Result<NarStreamData, AppError>>,
+        reply_to: OneshotSender<Result<StreamNarFileResult, AppError>>,
         headers: PassthroughHeaders,
     },
     SetLocation {
         location: NarFileLocation,
         store_path_hash: StorePathHash,
     },
-    SetStorePathHash(StorePathHash),
 }
 
 pub struct NarFileActor {
@@ -81,8 +85,10 @@ impl Actor for NarFileActor {
                 let now = SystemTime::now();
                 let state = state.check_expiry_and_update(now);
                 let (state, result) = self.nar_file_service.stream(state, headers, now).await;
-                let result =
-                    result.map(|data| data.with_store_path_hash(state.store_path_hash().cloned()));
+                let result = result.map(|stream| StreamNarFileResult {
+                    stream,
+                    store_path_hash: state.store_path_hash().cloned(),
+                });
 
                 let _ = reply_to.send(result);
                 if let Err(err) = self.nar_file_repository.save(state.clone()).await {
@@ -97,22 +103,8 @@ impl Actor for NarFileActor {
             } => {
                 let now = SystemTime::now();
                 let expire_at = ExpireAt::since(now, self.nar_file_ttl);
-                let state = state
-                    .on_located(location, expire_at)
-                    .with_store_path_hash(store_path_hash);
+                let state = state.on_located(location, expire_at, Some(store_path_hash));
 
-                if let Err(err) = self.nar_file_repository.save(state.clone()).await {
-                    tracing::warn!(file_hash = %state.key().file_hash(), %err, "failed to write nar file to persistent cache, ignore");
-                }
-
-                Some(state)
-            }
-            NarFileRequest::SetStorePathHash(store_path_hash) => {
-                if state.store_path_hash() == Some(&store_path_hash) {
-                    return Some(state);
-                }
-
-                let state = state.with_store_path_hash(store_path_hash);
                 if let Err(err) = self.nar_file_repository.save(state.clone()).await {
                     tracing::warn!(file_hash = %state.key().file_hash(), %err, "failed to write nar file to persistent cache, ignore");
                 }

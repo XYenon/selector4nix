@@ -73,18 +73,12 @@ impl ProxyNarInfoData {
             .fold(String::new(), |acc, x| acc + &x + "\n")
     }
 
-    /// Full store path from the narinfo body, e.g. `/nix/store/hash-name`.
     pub fn store_path(&self) -> Option<&str> {
         self.content.lines().find_map(|line| {
             line.strip_prefix("StorePath:")
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
         })
-    }
-
-    /// Package name portion after the store hash, e.g. `codex-0.144.5`.
-    pub fn store_path_name(&self) -> Option<&str> {
-        crate::domain::common::store_path::store_path_name(self.store_path()?)
     }
 }
 
@@ -210,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn store_path_name_extracts_package_name() {
+    fn store_path_extracts_full_path() {
         let data = UpstreamNarInfoData::new(
             "StorePath: /nix/store/zj64jfhbxbync50az13gxr6k7bnqhcb3-codex-0.144.5\n\
              URL: nar/abc.nar.xz\n"
@@ -222,6 +216,5 @@ mod tests {
             proxy.store_path(),
             Some("/nix/store/zj64jfhbxbync50az13gxr6k7bnqhcb3-codex-0.144.5")
         );
-        assert_eq!(proxy.store_path_name(), Some("codex-0.144.5"));
     }
 }

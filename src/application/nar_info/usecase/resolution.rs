@@ -102,16 +102,6 @@ impl NarInfoResolutionUseCase {
                     })
                     .await;
             }
-            ResolveNarInfoEvent::NarFileLinked {
-                nar_file,
-                store_path_hash,
-            } => {
-                let nar_file_key = NarFileKey::from_file_name(&nar_file);
-                let sender = self.nar_file_registry.get(&nar_file_key).await;
-                let _ = sender
-                    .tell(NarFileRequest::SetStorePathHash(store_path_hash))
-                    .await;
-            }
         }
     }
 }

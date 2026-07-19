@@ -12,7 +12,6 @@ pub struct NarFile {
     #[getset(get = "pub")]
     key: NarFileKey,
     location: Option<(NarFileLocation, ExpireAt)>,
-    /// Reverse link to the corresponding `NarInfo` identity (store path hash).
     #[serde(default)]
     store_path_hash: Option<StorePathHash>,
 }
@@ -26,18 +25,21 @@ impl NarFile {
         }
     }
 
-    pub fn on_located(mut self, location: NarFileLocation, expire_at: ExpireAt) -> Self {
+    pub fn on_located(
+        mut self,
+        location: NarFileLocation,
+        expire_at: ExpireAt,
+        store_path_hash: Option<StorePathHash>,
+    ) -> Self {
         self.location = Some((location, expire_at));
+        if let Some(store_path_hash) = store_path_hash {
+            self.store_path_hash = Some(store_path_hash);
+        }
         self
     }
 
     pub fn on_relocated(mut self, location: NarFileLocation) -> Self {
         self.location = self.location.map(|(_, expire_at)| (location, expire_at));
-        self
-    }
-
-    pub fn with_store_path_hash(mut self, store_path_hash: StorePathHash) -> Self {
-        self.store_path_hash = Some(store_path_hash);
         self
     }
 
@@ -87,7 +89,7 @@ mod tests {
             ),
             None,
         );
-        NarFile::new(key).on_located(location, ExpireAt::new(expire_at))
+        NarFile::new(key).on_located(location, ExpireAt::new(expire_at), None)
     }
 
     #[test]
@@ -110,12 +112,5 @@ mod tests {
         let nar_file = nar_file.check_expiry_and_update(now);
 
         assert!(nar_file.location().is_some());
-    }
-
-    #[test]
-    fn with_store_path_hash_sets_reverse_link() {
-        let hash = StorePathHash::new("p4pclmv1gyja5kzc26npqpia1qqxrf0l".into()).unwrap();
-        let nar_file = make_nar_file(SystemTime::now()).with_store_path_hash(hash.clone());
-        assert_eq!(nar_file.store_path_hash(), Some(&hash));
     }
 }

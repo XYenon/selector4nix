@@ -6,7 +6,6 @@ use redb::Database;
 use redb::backends::InMemoryBackend;
 use selector4nix::api::AppContext;
 use selector4nix::api::handlers::status::get_status;
-use selector4nix::application::nar_file::ActiveDownloadRegistry;
 use selector4nix::application::nar_file::actor::{NarFileActor, NarFileActorRegistry};
 use selector4nix::application::nar_file::usecase::NarFileStreamingUseCase;
 use selector4nix::application::nar_info::actor::{NarInfoActor, NarInfoActorRegistry};
@@ -19,6 +18,7 @@ use selector4nix::application::substituter::usecase::SubstituterQueryUseCase;
 use selector4nix::domain::common::url::Url;
 use selector4nix::domain::substituter::SubstituterRepository;
 use selector4nix::infrastructure::config::AppConfiguration;
+use selector4nix::infrastructure::metric::MetricStore;
 use selector4nix::infrastructure::repository::{
     CacheKvNarFileRepository, CacheKvNarInfoRepository, InMemorySubstituterRepository,
 };
@@ -88,7 +88,7 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
 
     let nar_info_registry = nar_info_registry();
     let nar_file_registry = nar_file_registry();
-    let active_downloads = Arc::new(ActiveDownloadRegistry::new());
+    let metrics = Arc::new(MetricStore::new());
     let status_query_usecase = StatusQueryUseCase::new(
         substituter_repository.clone(),
         Arc::new(StatusRuntimeInfo {
@@ -101,7 +101,7 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
         nar_file_registry.clone(),
         nar_info_repository.clone(),
         nar_file_repository,
-        active_downloads.clone(),
+        metrics.nar_transfer.clone(),
     );
 
     let ctx = AppContext::new(
@@ -111,7 +111,11 @@ async fn status_endpoint_returns_runtime_config_and_substituters() {
             substituter_registry(),
             nar_file_registry.clone(),
         ),
-        NarFileStreamingUseCase::new(nar_file_registry, nar_info_repository, active_downloads),
+        NarFileStreamingUseCase::new(
+            nar_file_registry,
+            nar_info_repository,
+            metrics.nar_transfer.clone(),
+        ),
         status_query_usecase,
         config.cache_info.clone(),
     );

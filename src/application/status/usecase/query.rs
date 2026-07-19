@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::application::nar_file::actor::NarFileActorRegistry;
-use crate::application::nar_file::{ActiveDownloadRegistry, ActiveDownloadSnapshot};
 use crate::application::nar_info::actor::NarInfoActorRegistry;
 use crate::domain::common::url::Url;
 use crate::domain::nar_file::NarFileRepository;
@@ -10,6 +9,7 @@ use crate::domain::nar_info::NarInfoRepository;
 use crate::domain::substituter::SubstituterRepository;
 use crate::domain::substituter::model::{Availability, Substituter};
 use crate::infrastructure::config::AppConfiguration;
+use crate::infrastructure::metric::{NarTransferMetric, NarTransferSample};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CacheMode {
@@ -33,7 +33,7 @@ pub struct StatusSnapshot {
     pub nar_file_actor_entries: usize,
     pub nar_info_persistent_entries: usize,
     pub nar_file_persistent_entries: usize,
-    pub active_downloads: Vec<ActiveDownloadSnapshot>,
+    pub active_transfers: Vec<NarTransferSample>,
 }
 
 pub struct StatusQueryUseCase {
@@ -43,7 +43,7 @@ pub struct StatusQueryUseCase {
     nar_file_registry: Arc<NarFileActorRegistry>,
     nar_info_repository: Arc<dyn NarInfoRepository>,
     nar_file_repository: Arc<dyn NarFileRepository>,
-    active_downloads: Arc<ActiveDownloadRegistry>,
+    nar_transfer_metric: Arc<NarTransferMetric>,
 }
 
 impl StatusQueryUseCase {
@@ -54,7 +54,7 @@ impl StatusQueryUseCase {
         nar_file_registry: Arc<NarFileActorRegistry>,
         nar_info_repository: Arc<dyn NarInfoRepository>,
         nar_file_repository: Arc<dyn NarFileRepository>,
-        active_downloads: Arc<ActiveDownloadRegistry>,
+        nar_transfer_metric: Arc<NarTransferMetric>,
     ) -> Self {
         Self {
             substituter_repository,
@@ -63,7 +63,7 @@ impl StatusQueryUseCase {
             nar_file_registry,
             nar_info_repository,
             nar_file_repository,
-            active_downloads,
+            nar_transfer_metric,
         }
     }
 
@@ -71,7 +71,7 @@ impl StatusQueryUseCase {
         tracing::info!("querying status snapshot");
 
         let substituters = self.substituter_repository.query_all().await;
-        let active_downloads = self.active_downloads.list();
+        let active_transfers = self.nar_transfer_metric.active();
 
         let snapshot = StatusSnapshot {
             runtime: self.runtime.clone(),
@@ -104,7 +104,7 @@ impl StatusQueryUseCase {
                     tracing::warn!(%err, cache = "nar_file", "failed to get cache entry count");
                     0
                 }),
-            active_downloads,
+            active_transfers,
         };
 
         tracing::info!(
@@ -114,7 +114,7 @@ impl StatusQueryUseCase {
             nar_file_actor_entries = snapshot.nar_file_actor_entries,
             nar_info_persistent_entries = snapshot.nar_info_persistent_entries,
             nar_file_persistent_entries = snapshot.nar_file_persistent_entries,
-            active_downloads = snapshot.active_downloads.len(),
+            active_transfers = snapshot.active_transfers.len(),
             "queried status snapshot"
         );
 
