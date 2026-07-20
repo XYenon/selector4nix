@@ -72,6 +72,14 @@ impl ProxyNarInfoData {
             })
             .fold(String::new(), |acc, x| acc + &x + "\n")
     }
+
+    pub fn store_path(&self) -> Option<&str> {
+        self.content.lines().find_map(|line| {
+            line.strip_prefix("StorePath:")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
+    }
 }
 
 #[cfg(test)]
@@ -192,6 +200,21 @@ mod tests {
         assert_eq!(
             nar_source_url.value(),
             "https://other.com/custom/abc.nar.xz"
+        );
+    }
+
+    #[test]
+    fn store_path_extracts_full_path() {
+        let data = UpstreamNarInfoData::new(
+            "StorePath: /nix/store/zj64jfhbxbync50az13gxr6k7bnqhcb3-codex-0.144.5\n\
+             URL: nar/abc.nar.xz\n"
+                .into(),
+        )
+        .unwrap();
+        let (proxy, _) = ProxyNarInfoData::proxy_by_keep_url(&data, &make_meta());
+        assert_eq!(
+            proxy.store_path(),
+            Some("/nix/store/zj64jfhbxbync50az13gxr6k7bnqhcb3-codex-0.144.5")
         );
     }
 }
