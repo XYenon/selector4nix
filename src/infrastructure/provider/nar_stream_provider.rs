@@ -7,6 +7,7 @@ use selector4nix_streaming::{StreamHttpBodyError, StreamingClient, StreamingResp
 use tokio::task::JoinSet;
 
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
+use crate::domain::common::url::Url;
 use crate::domain::nar_file::model::NarFileLocation;
 use crate::domain::nar_file::port::{NarStreamData, NarStreamHeaders, NarStreamProvider};
 use crate::infrastructure::config::AppCredential;
@@ -25,7 +26,7 @@ impl ReqwestNarStreamProvider {
     }
 
     fn wrap_ok_response(
-        location: &NarFileLocation,
+        url: Url,
         response: StreamingResponse,
     ) -> AnyhowResult<Option<NarStreamData>> {
         let headers = NarStreamHeaders {
@@ -43,12 +44,7 @@ impl ReqwestNarStreamProvider {
         };
 
         let stream = response.into_stream();
-        Ok(Some(NarStreamData::new(
-            headers,
-            stream,
-            location.source_url().clone(),
-            location.substituter().clone(),
-        )))
+        Ok(Some(NarStreamData::new(headers, stream, url)))
     }
 }
 
@@ -106,7 +102,7 @@ impl NarStreamProvider for ReqwestNarStreamProvider {
             let url = location.source_url();
 
             match response {
-                Ok(Ok(response)) => return Self::wrap_ok_response(&location, response),
+                Ok(Ok(response)) => return Self::wrap_ok_response(url.clone(), response),
                 Ok(Err(StreamHttpBodyError::NotFound)) => {
                     not_found_count += 1;
                 }

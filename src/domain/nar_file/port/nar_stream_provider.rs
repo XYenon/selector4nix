@@ -8,7 +8,6 @@ use futures::Stream;
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::common::url::Url;
 use crate::domain::nar_file::model::NarFileLocation;
-use crate::domain::substituter::model::SubstituterMeta;
 
 #[async_trait]
 pub trait NarStreamProvider: Send + Sync {
@@ -23,7 +22,6 @@ pub struct NarStreamData {
     pub headers: NarStreamHeaders,
     pub inner: Pin<Box<dyn Stream<Item = AnyhowResult<Bytes>> + Send>>,
     pub source_url: Url,
-    pub substituter: SubstituterMeta,
 }
 
 impl NarStreamData {
@@ -31,13 +29,11 @@ impl NarStreamData {
         headers: NarStreamHeaders,
         inner: Pin<Box<dyn Stream<Item = AnyhowResult<Bytes>> + Send>>,
         source_url: Url,
-        substituter: SubstituterMeta,
     ) -> Self {
         Self {
             headers,
             inner,
             source_url,
-            substituter,
         }
     }
 }

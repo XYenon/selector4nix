@@ -6,7 +6,9 @@ use anyhow::Result as AnyhowResult;
 use bytes::Bytes;
 use futures::Stream;
 
-use crate::application::nar_file::actor::{NarFileActorRegistry, NarFileRequest};
+use crate::application::nar_file::actor::{
+    NarFileActorRegistry, NarFileRequest, StreamNarFileResult,
+};
 use crate::domain::common::passthrough_headers::PassthroughHeaders;
 use crate::domain::nar_file::model::NarFileKey;
 use crate::domain::nar_file::port::NarStreamData;
@@ -48,25 +50,25 @@ impl NarFileStreamingUseCase {
             .await
             .throw_catastrophic("`NarFileActor` terminated unexpectedly")?;
 
-        let result = response
-            .inspect(|result| tracing::info!(nar_file = %key.to_file_name().value(), source_url = %result.stream.source_url, substituter = %result.stream.substituter.url(), "streamed nar from substituter"))
+        let StreamNarFileResult {
+            stream,
+            substituter,
+            store_path_hash,
+        } = response
+            .inspect(|result| tracing::info!(nar_file = %key.to_file_name().value(), source_url = %result.stream.source_url, substituter = %result.substituter.url(), "streamed nar from substituter"))
             .inspect_err(|err| tracing::warn!(nar_file = %key.to_file_name().value(), %err, "failed to stream nar"))?;
 
-        let store_path = self.query_store_path(result.store_path_hash.as_ref()).await;
+        let store_path = self.query_store_path(store_path_hash.as_ref()).await;
 
         let attrs = NarTransferAttrs {
             nar_file: key.to_file_name().value().to_string(),
             store_path,
-            substituter_url: result.stream.substituter.url().clone(),
-            source_url: result.stream.source_url.clone(),
-            content_length: result.stream.headers.content_length,
+            substituter_url: substituter.url().clone(),
+            source_url: stream.source_url.clone(),
+            content_length: stream.headers.content_length,
         };
 
-        Ok(instrument_stream(
-            &self.nar_transfer_metric,
-            attrs,
-            result.stream,
-        ))
+        Ok(instrument_stream(&self.nar_transfer_metric, attrs, stream))
     }
 
     async fn query_store_path(&self, hash: Option<&StorePathHash>) -> Option<String> {
@@ -87,13 +89,12 @@ fn instrument_stream(
         headers,
         inner,
         source_url,
-        substituter,
     } = data;
 
     let handle = metric.begin(attrs);
     let instrumented = InstrumentedNarStream { inner, handle };
 
-    NarStreamData::new(headers, Box::pin(instrumented), source_url, substituter)
+    NarStreamData::new(headers, Box::pin(instrumented), source_url)
 }
 
 struct InstrumentedNarStream {
@@ -154,7 +155,6 @@ mod tests {
                 Ok(Bytes::from_static(b"cde")),
             ])),
             source.clone(),
-            meta.clone(),
         );
 
         let attrs = NarTransferAttrs {

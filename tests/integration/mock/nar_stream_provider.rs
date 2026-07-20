@@ -53,7 +53,6 @@ impl NarStreamProvider for MockNarStreamProvider {
                     },
                     Box::pin(futures::stream::empty()),
                     loc.source_url().clone(),
-                    loc.substituter().clone(),
                 );
                 return Ok(Some(data));
             }

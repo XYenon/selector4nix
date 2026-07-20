@@ -11,9 +11,11 @@ use crate::domain::nar_file::model::{NarFile, NarFileKey, NarFileLocation};
 use crate::domain::nar_file::port::NarStreamData;
 use crate::domain::nar_file::{NarFileRepository, NarFileService};
 use crate::domain::nar_info::model::StorePathHash;
+use crate::domain::substituter::model::SubstituterMeta;
 
 pub struct StreamNarFileResult {
     pub stream: NarStreamData,
+    pub substituter: SubstituterMeta,
     pub store_path_hash: Option<StorePathHash>,
 }
 
@@ -87,6 +89,11 @@ impl Actor for NarFileActor {
                 let (state, result) = self.nar_file_service.stream(state, headers, now).await;
                 let result = result.map(|stream| StreamNarFileResult {
                     stream,
+                    substituter: state
+                        .location()
+                        .expect("`NarFile` should have a location after a successful stream")
+                        .substituter()
+                        .clone(),
                     store_path_hash: state.store_path_hash().cloned(),
                 });
 
